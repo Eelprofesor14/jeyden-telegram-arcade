@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Bastion Merge: Lane Defense</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    try {
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        if (window.Telegram.WebApp.expand) window.Telegram.WebApp.expand();
+        if (window.Telegram.WebApp.disableVerticalSwipes) window.Telegram.WebApp.disableVerticalSwipes();
+      }
+    } catch (e) {}
+  });
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #040814;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #F8FAFC;
+    touch-action: none;
+  }
+  #wrap {
+    position: relative;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 46% 42%, #101E3A 0%, #060B18 65%, #03060E 100%);
+  }
+  canvas {
+    display: block;
+    width: 100%; height: 100%;
+  }
+
+  /* Top HUD */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 12px; gap: 8px;
+    pointer-events: none; z-index: 12;
+  }
+  .hud-grp { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    background: rgba(11, 19, 38, 0.88);
+    border: 1px solid rgba(56, 189, 248, 0.32);
+    border-radius: 10px;
+    padding: 4px 10px;
+    backdrop-filter: blur(8px);
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 56px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .pill.gold { border-color: rgba(251, 191, 36, 0.48); }
+  .pill.cores { border-color: rgba(192, 132, 252, 0.48); }
+  .pill-lbl { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; line-height: 1.1; }
+  .pill-val { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.2; color: #F8FAFC; }
+  .pill-val.cyan { color: #38BDF8; }
+  .pill-val.amber { color: #FBBF24; }
+  .pill-val.violet { color: #E879F9; }
+  .pill-val.rose { color: #FB7185; }
+
+  .hud-btn {
+    pointer-events: auto;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #F8FAFC;
+    border-radius: 9px;
+    padding: 6px 10px;
+    font-size: 11.5px; font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .hud-btn:hover { border-color: #38BDF8; background: rgba(30, 41, 59, 0.98); }
+  .hud-btn:active { transform: scale(0.95); }
+  .hud-btn.armory-btn {
+    border-color: rgba(232, 121, 249, 0.6);
+    background: linear-gradient(135deg, rgba(112, 26, 117, 0.72), rgba(30, 41, 59, 0.92));
+    color: #F5D0FE;
+  }
+  .hud-btn.armory-btn.glow { box-shadow: 0 0 14px rgba(232, 121, 249, 0.55); }
+  .hud-btn.turbo-btn {
+    border-color: rgba(251, 191, 36, 0.6);
+    background: linear-gradient(135deg, rgba(180, 83, 9, 0.55), rgba(30, 41, 59, 0.92));
+    color: #FDE68A;
+  }
+  .hud-btn.spd-on { border-color: #38BDF8; background: rgba(14, 165, 233, 0.28); color: #7DD3FC; }
+
+  /* Bottom Action Bar */
+  #action-bar {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px;
+    z-index: 12; pointer-events: auto;
+  }
+  #btn-buy {
+    background: linear-gradient(135deg, #0EA5E9, #2563EB);
+    border: 1px solid rgba(186, 230, 253, 0.55);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 13px;
+    font-size: 14px; font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45);
+    display: flex; align-items: center; gap: 8px;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+    white-space: nowrap;
+  }
+  #btn-buy:hover { transform: translateY(-1px); }
+  #btn-buy:active { transform: scale(0.96); }
+  #btn-buy.disabled { opacity: 0.48; filter: grayscale(0.35); }
+  .buy-cost {
+    background: rgba(15, 23, 42, 0.55);
+    padding: 3px 8px; border-radius: 8px;
+    color: #FDE047; font-size: 13px;
+  }
+  #btn-auto-merge {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(52, 211, 153, 0.5);
+    color: #6EE7B7;
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: 12.5px; font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #btn-auto-merge:hover { background: rgba(6, 78, 59, 0.6); }
+
+  #toast {
+    position: absolute; top: 58px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    background: rgba(11, 19, 38, 0.95);
+    border: 1px solid rgba(56, 189, 248, 0.55);
+    color: #F8FAFC; padding: 7px 16px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 800;
+    z-index: 45; pointer-events: none;
+    opacity: 0; transition: opacity 0.22s ease, transform 0.22s ease;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.55);
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Modals */
+  .overlay {
+    position: absolute; inset: 0;
+    background: rgba(3, 6, 14, 0.8);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 30; padding: 14px;
+  }
+  .overlay.show { display: flex; }
+  .panel {
+    width: 100%; max-width: 450px; max-height: 90vh; overflow-y: auto;
+    background: linear-gradient(180deg, rgba(16, 25, 48, 0.97), rgba(9, 14, 29, 0.99));
+    border: 1px solid rgba(56, 189, 248, 0.42);
+    border-radius: 18px; padding: 20px 18px;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+  }
+  .panel h2 {
+    font-size: 24px; font-weight: 900;
+    background: linear-gradient(90deg, #38BDF8, #E879F9, #FBBF24);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .panel p.sub { font-size: 12.5px; color: #94A3B8; margin-bottom: 14px; }
+
+  .btn-primary {
+    width: 100%; padding: 12px 16px;
+    border: 1px solid rgba(125, 211, 252, 0.4); border-radius: 12px;
+    background: linear-gradient(135deg, #0EA5E9, #2563EB);
+    color: #fff; font-size: 15px; font-weight: 800;
+    cursor: pointer; margin-bottom: 8px;
+  }
+  .btn-reward {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid rgba(251, 191, 36, 0.68);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.24), rgba(217, 119, 6, 0.14));
+    color: #FDE68A; font-size: 13.5px; font-weight: 800;
+    cursor: pointer; margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-secondary {
+    width: 100%; padding: 10px 14px;
+    border: 1px solid rgba(232, 121, 249, 0.5);
+    border-radius: 12px; background: rgba(88, 28, 135, 0.36);
+    color: #F5D0FE; font-size: 13.5px; font-weight: 800;
+    cursor: pointer; margin-bottom: 8px;
+  }
+  .btn-ghost {
+    width: 100%; padding: 9px 14px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 11px; background: rgba(30, 41, 59, 0.65);
+    color: #E2E8F0; font-size: 13px; font-weight: 700;
+    cursor: pointer; margin-bottom: 8px;
+  }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 14px; }
+  .stat-box { background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 10px; padding: 8px 5px; }
+  .stat-box .lbl { font-size: 9.5px; color: #94A3B8; text-transform: uppercase; font-weight: 800; }
+  .stat-box .val { font-size: 15.5px; font-weight: 900; color: #F8FAFC; margin-top: 2px; }
+
+  .armory-list { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; text-align: left; }
+  .armory-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: rgba(30, 41, 59, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 11px; padding: 9px 12px;
+  }
+  .armory-item .t { font-size: 13px; font-weight: 800; color: #F8FAFC; }
+  .armory-item .d { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+  .buy-core-btn {
+    padding: 7px 12px; border-radius: 9px; border: none;
+    font-weight: 800; font-size: 12px; cursor: pointer; flex-shrink: 0;
+    background: linear-gradient(135deg, #C026D3, #7C3AED); color: #fff;
+  }
+  .buy-core-btn:disabled { background: #334155; color: #64748B; cursor: not-allowed; }
+
+  @media (max-width: 640px) {
+    #hud { padding: 5px 7px; }
+    .pill { min-width: 46px; padding: 3px 6px; }
+    .pill-val { font-size: 13px; }
+    .hud-btn { padding: 5px 7px; font-size: 10.5px; }
+    #btn-buy { padding: 8px 13px; font-size: 12.5px; }
+    #btn-auto-merge { padding: 8px 10px; font-size: 11.5px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="hud-grp">
+      <div class="pill"><span class="pill-lbl">Wave</span><span class="pill-val cyan" id="hud-wave">1</span></div>
+      <div class="pill gold"><span class="pill-lbl">Gold</span><span class="pill-val amber" id="hud-gold">60</span></div>
+      <div class="pill"><span class="pill-lbl">Bastion</span><span class="pill-val rose" id="hud-hp">100</span></div>
+      <div class="pill cores"><span class="pill-lbl">Cores</span><span class="pill-val violet" id="hud-cores">0</span></div>
+    </div>
+    <div class="hud-grp">
+      <button class="hud-btn turbo-btn" id="btn-turbo" title="Watch Ad: 3m 2x Damage & Gold">🎬 Turbo 2x</button>
+      <button class="hud-btn armory-btn" id="btn-armory" title="Permanent Upgrades">⚡ Armory</button>
+      <button class="hud-btn" id="btn-speed" title="Game Speed (S)">1x</button>
+      <button class="hud-btn" id="btn-bgm" title="Toggle Music">BGM: ON</button>
+      <button class="hud-btn" id="btn-sfx" title="Toggle Sound (M)">SFX: ON</button>
+      <button class="hud-btn" id="btn-pause" title="Pause (P)">⏸</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="action-bar">
+    <button id="btn-buy" title="Spawn Turret (Space / B)">
+      <span>+ Spawn Turret</span>
+      <span class="buy-cost" id="buy-cost">20 🪙</span>
+    </button>
+    <button id="btn-auto-merge" title="Merge matching pair (F)">⚡ Quick Merge</button>
+  </div>
+
+  <!-- Boss Cleared Rewarded Bonus Modal -->
+  <div class="overlay" id="boss-overlay">
+    <div class="panel">
+      <h2 id="boss-title">DREADNOUGHT DESTROYED!</h2>
+      <p class="sub">Massive core bounty recovered from boss wreckage</p>
+      <div style="font-size:20px;font-weight:900;color:#FDE047;margin-bottom:14px;" id="boss-reward-txt">+120 🪙 &amp; +8 💠</div>
+      <button class="btn-reward" id="btn-boss-double">🎬 Watch Ad: Double Boss Bounty (2x)!</button>
+      <button class="btn-primary" id="btn-boss-claim">Continue Next Wave</button>
+    </div>
+  </div>
+
+  <!-- Offline / Daily Welcome Modal -->
+  <div class="overlay" id="welcome-overlay">
+    <div class="panel">
+      <h2 id="welcome-title">COMMANDER RETURNED</h2>
+      <p class="sub" id="welcome-sub">Bastion generators collected resources while away</p>
+      <div style="font-size:20px;font-weight:900;color:#E879F9;margin-bottom:14px;" id="welcome-reward-txt">+15 💠 Cores</div>
+      <button class="btn-reward" id="btn-welcome-double">🎬 Watch Ad: Claim 2x Bonus!</button>
+      <button class="btn-primary" id="btn-welcome-claim">Collect</button>
+    </div>
+  </div>
+
+  <!-- Bastion Armory (Permanent Meta-Progression) -->
+  <div class="overlay" id="armory-overlay">
+    <div class="panel">
+      <h2>BASTION ARMORY</h2>
+      <p class="sub">Permanent upgrades persist across all battles</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(30,41,59,0.8);border:1px solid rgba(232,121,249,0.4);padding:8px 14px;border-radius:11px;margin-bottom:12px;">
+        <span style="font-size:12px;color:#CBD5E1;font-weight:700;">Tech Cores Available</span>
+        <span style="font-size:17px;color:#E879F9;font-weight:900;" id="armory-cores-val">0 💠</span>
+      </div>
+      <div class="armory-list" id="armory-list"></div>
+      <button class="btn-primary" id="btn-armory-close">Return to Defense</button>
+    </div>
+  </div>
+
+  <!-- Pause Modal -->
+  <div class="overlay" id="pause-overlay">
+    <div class="panel">
+      <h2>DEFENSE PAUSED</h2>
+      <p class="sub">Turret grid holding position</p>
+      <button class="btn-primary" id="btn-resume">▶ Resume Battle</button>
+      <button class="btn-secondary" id="btn-pause-armory">⚡ Bastion Armory</button>
+      <button class="btn-ghost" id="btn-restart">↻ New Run</button>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div class="overlay" id="over-overlay">
+    <div class="panel">
+      <h2>BASTION BREACHED</h2>
+      <p class="sub">All earned Tech Cores saved to Bastion Armory</p>
+      <div class="stat-row">
+        <div class="stat-box"><div class="lbl">Wave</div><div class="val" id="over-wave">1</div></div>
+        <div class="stat-box"><div class="lbl">Score</div><div class="val" id="over-score">0</div></div>
+        <div class="stat-box"><div class="lbl">Best</div><div class="val" id="over-best">0</div></div>
+        <div class="stat-box"><div class="lbl">Cores</div><div class="val" style="color:#E879F9;" id="over-cores">+0 💠</div></div>
+      </div>
+      <button class="btn-reward" id="btn-revive">🎬 Watch Ad: EMP Blast &amp; 50% HP Revive</button>
+      <button class="btn-secondary" id="btn-over-armory">⚡ Upgrade Bastion Armory</button>
+      <button class="btn-primary" id="btn-play-again">Deploy New Defense</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// Unified Multi-Portal SDK Bridge (Strict Per-Portal Isolation)
+// Target injected at build time: itch ('crazygames' | 'playgama' | 'gamepix' | 'itch')
+// ============================================================================
+const SDKBridge = (() => {
+  const PLATFORM = 'itch';
+  const SAVE_KEY = 'bastion_merge_save_v1';
+
+  let ready = false;
+  let inGameplay = false;
+  let adActive = false;
+  let lastMidgameMs = performance.now();
+  let audioMuteCallback = null;
+  let pauseCallback = null;
+  let cgSdk = null;
+  let pgBridge = null;
+
+  function notifyMute(muted) {
+    if (typeof audioMuteCallback === 'function') audioMuteCallback(!!muted);
+  }
+
+  function notifyPause(paused) {
+    if (typeof pauseCallback === 'function') pauseCallback(!!paused);
+  }
+
+  async function init(opts = {}) {
+    audioMuteCallback = opts.onMuteChange || null;
+    pauseCallback = opts.onPauseChange || null;
+
+    if (PLATFORM === 'crazygames') {
+      try {
+        let tries = 0;
+        while (!(window.CrazyGames && window.CrazyGames.SDK) && tries < 35) {
+          await new Promise(r => setTimeout(r, 100));
+          tries++;
+        }
+        if (window.CrazyGames && window.CrazyGames.SDK) {
+          await window.CrazyGames.SDK.init();
+          cgSdk = window.CrazyGames.SDK;
+          ready = true;
+          if (cgSdk.game && cgSdk.game.loadingStart) cgSdk.game.loadingStart();
+          if (cgSdk.game && cgSdk.game.settings && cgSdk.game.settings.muteAudio) {
+            notifyMute(true);
+          }
+          if (cgSdk.game && cgSdk.game.addSettingsChangeListener) {
+            cgSdk.game.addSettingsChangeListener(s => {
+              if (typeof s.muteAudio === 'boolean') notifyMute(s.muteAudio);
+            });
+          }
+          if (cgSdk.game && cgSdk.game.loadingStop) cgSdk.game.loadingStop();
+        }
+      } catch (e) {}
+      return;
+    }
+
+    if (PLATFORM === 'playgama') {
+      try {
+        let tries = 0;
+        while (!window.bridge && tries < 35) {
+          await new Promise(r => setTimeout(r, 100));
+          tries++;
+        }
+        if (window.bridge) {
+          pgBridge = window.bridge;
+          await pgBridge.initialize();
+          ready = true;
+          if (pgBridge.platform) {
+            if (pgBridge.platform.isAudioEnabled === false) notifyMute(true);
+            if (pgBridge.platform.on) {
+              pgBridge.platform.on('audio_state_changed', isEnabled => notifyMute(!isEnabled));
+              pgBridge.platform.on('pause_state_changed', isPaused => {
+                notifyPause(isPaused);
+                notifyMute(isPaused);
+              });
+            }
+            if (pgBridge.platform.sendMessage) {
+              pgBridge.platform.sendMessage('game_ready');
+            }
+          }
+        }
+      } catch (e) {}
+      return;
+    }
+
+    if (PLATFORM === 'gamepix') {
+      ready = typeof window.GamePix !== 'undefined';
+      return;
+    }
+
+    ready = true;
+  }
+
+  function gameplayStart() {
+    if (inGameplay || adActive) return;
+    inGameplay = true;
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.game) {
+        cgSdk.game.gameplayStart();
+      } else if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.platform && pgBridge.platform.sendMessage) {
+        pgBridge.platform.sendMessage('gameplay_started');
+      }
+    } catch (e) {}
+  }
+
+  function gameplayStop() {
+    if (!inGameplay) return;
+    inGameplay = false;
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.game) {
+        cgSdk.game.gameplayStop();
+      } else if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.platform && pgBridge.platform.sendMessage) {
+        pgBridge.platform.sendMessage('gameplay_stopped');
+      }
+    } catch (e) {}
+  }
+
+  function happyTime() {
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.game) {
+        cgSdk.game.happytime();
+      } else if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.happyMoment) {
+        window.GamePix.happyMoment();
+      } else if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.platform && pgBridge.platform.sendMessage) {
+        pgBridge.platform.sendMessage('player_got_achievement');
+      }
+    } catch (e) {}
+  }
+
+  function reportScoreAndWave(score, wave) {
+    try {
+      if (PLATFORM === 'gamepix' && window.GamePix) {
+        if (window.GamePix.updateScore) window.GamePix.updateScore(Math.floor(Number(score) || 0));
+        if (window.GamePix.updateLevel) window.GamePix.updateLevel(Math.floor(Number(wave) || 1));
+      }
+    } catch (e) {}
+  }
+
+  async function loadData() {
+    let localRaw = null;
+    try { localRaw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.data) {
+        const cRaw = cgSdk.data.getItem(SAVE_KEY);
+        if (cRaw) return cRaw;
+      } else if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.storage) {
+        const res = await pgBridge.storage.get(SAVE_KEY);
+        if (res && typeof res === 'string') return res;
+        if (Array.isArray(res) && typeof res[0] === 'string') return res[0];
+      } else if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.localStorage) {
+        const gRaw = window.GamePix.localStorage.getItem(SAVE_KEY);
+        if (gRaw) return gRaw;
+      }
+    } catch (e) {}
+
+    return localRaw;
+  }
+
+  function saveData(jsonStr) {
+    try { localStorage.setItem(SAVE_KEY, jsonStr); } catch (e) {}
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.data) {
+        cgSdk.data.setItem(SAVE_KEY, jsonStr);
+      } else if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.storage) {
+        pgBridge.storage.set(SAVE_KEY, jsonStr).catch(() => {});
+      } else if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.localStorage) {
+        window.GamePix.localStorage.setItem(SAVE_KEY, jsonStr);
+      }
+    } catch (e) {}
+  }
+
+  function showMidgameAd(onComplete) {
+    const now = performance.now();
+    if (adActive || now - lastMidgameMs < 75000) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    const wasPlaying = inGameplay;
+    gameplayStop();
+    adActive = true;
+    notifyPause(true);
+    notifyMute(true);
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      adActive = false;
+      lastMidgameMs = performance.now();
+      notifyMute(false);
+      notifyPause(false);
+      if (onComplete) onComplete();
+      if (wasPlaying) gameplayStart();
+    };
+
+    const safety = setTimeout(finish, 5000);
+
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.ad) {
+        cgSdk.ad.requestAd('midgame', {
+          adStarted: () => { clearTimeout(safety); notifyMute(true); },
+          adFinished: finish,
+          adError: finish
+        });
+        return;
+      }
+      if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.advertisement && pgBridge.advertisement.isInterstitialSupported) {
+        const handler = state => {
+          if (state === 'opened') clearTimeout(safety);
+          if (state === 'closed' || state === 'failed') {
+            if (pgBridge.advertisement.off) pgBridge.advertisement.off('interstitial_state_changed', handler);
+            finish();
+          }
+        };
+        if (pgBridge.advertisement.on) pgBridge.advertisement.on('interstitial_state_changed', handler);
+        pgBridge.advertisement.showInterstitial();
+        return;
+      }
+      if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.interstitialAd) {
+        clearTimeout(safety);
+        window.GamePix.interstitialAd().then(finish).catch(finish);
+        return;
+      }
+    } catch (e) {}
+
+    clearTimeout(safety);
+    finish();
+  }
+
+  function showRewardedAd(onResult) {
+    if (adActive) return;
+    const wasPlaying = inGameplay;
+    gameplayStop();
+    adActive = true;
+    notifyPause(true);
+    notifyMute(true);
+
+    let settled = false;
+    const finish = (rewarded) => {
+      if (settled) return;
+      settled = true;
+      adActive = false;
+      notifyMute(false);
+      notifyPause(false);
+      if (onResult) onResult(!!rewarded);
+      if (wasPlaying) gameplayStart();
+    };
+
+    const safety = setTimeout(() => finish(false), 5000);
+
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.ad) {
+        cgSdk.ad.requestAd('rewarded', {
+          adStarted: () => { clearTimeout(safety); notifyMute(true); },
+          adFinished: () => finish(true),
+          adError: () => finish(false)
+        });
+        return;
+      }
+      if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.advertisement && pgBridge.advertisement.isRewardedSupported) {
+        let gotReward = false;
+        const handler = state => {
+          if (state === 'opened') clearTimeout(safety);
+          if (state === 'rewarded') gotReward = true;
+          if (state === 'closed' || state === 'failed') {
+            if (pgBridge.advertisement.off) pgBridge.advertisement.off('rewarded_state_changed', handler);
+            finish(gotReward);
+          }
+        };
+        if (pgBridge.advertisement.on) pgBridge.advertisement.on('rewarded_state_changed', handler);
+        pgBridge.advertisement.showRewarded();
+        return;
+      }
+      if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.rewardAd) {
+        clearTimeout(safety);
+        window.GamePix.rewardAd().then(res => finish(!!(res && res.success))).catch(() => finish(false));
+        return;
+      }
+      if (PLATFORM === 'itch') {
+        clearTimeout(safety);
+        finish(true);
+        return;
+      }
+    } catch (e) {}
+
+    clearTimeout(safety);
+    // Local testing fallback when no host SDK is injected
+    finish(!ready);
+  }
+
+  return {
+    PLATFORM,
+    init,
+    gameplayStart,
+    gameplayStop,
+    happyTime,
+    reportScoreAndWave,
+    loadData,
+    saveData,
+    showMidgameAd,
+    showRewardedAd,
+    isAdActive: () => adActive
+  };
+})();
+
+(() => {
+  'use strict';
+
+  // --- Toast Helper ---
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2300);
+  }
+
+  // --- Filtered Web Audio Engine (Zero Clipping, Instant Ad Mute) ---
+  const AudioSys = {
+    ctx: null,
+    master: null,
+    sfxMuted: false,
+    bgmMuted: false,
+    sdkMuted: false,
+    bgmTimer: null,
+    bgmIdx: 0,
+    lastShotMs: 0,
+    arp: [146.83, 174.61, 220.00, 261.63, 293.66, 220.00, 196.00, 164.81],
+    unlock() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+        const comp = this.ctx.createDynamicsCompressor();
+        comp.threshold.value = -16;
+        comp.ratio.value = 6;
+        const lpf = this.ctx.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 3400;
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.sdkMuted ? 0.0001 : 0.85;
+        this.master.connect(lpf);
+        lpf.connect(comp);
+        comp.connect(this.ctx.destination);
+      }
+      if (this.ctx.state === 'suspended' && !this.sdkMuted && !document.hidden) {
+        this.ctx.resume().catch(() => {});
+      }
+      this.startBGM();
+    },
+    setSdkMute(muted) {
+      this.sdkMuted = !!muted;
+      if (this.master && this.ctx) {
+        this.master.gain.setTargetAtTime(muted ? 0.0001 : 0.85, this.ctx.currentTime, 0.03);
+      }
+    },
+    startBGM() {
+      if (this.bgmTimer || !this.ctx) return;
+      this.bgmTimer = setInterval(() => {
+        if (this.bgmMuted || this.sdkMuted || !this.ctx || this.ctx.state !== 'running' || document.hidden) return;
+        const now = this.ctx.currentTime;
+        const freq = this.arp[this.bgmIdx % this.arp.length];
+        this.bgmIdx++;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.linearRampToValueAtTime(0.024, now + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.0005, now + 0.48);
+        osc.connect(g); g.connect(this.master);
+        osc.start(now); osc.stop(now + 0.5);
+      }, 430);
+    },
+    canPlay() { return !this.sfxMuted && !this.sdkMuted && !!this.ctx && this.ctx.state === 'running'; },
+    playShot(tier) {
+      if (!this.canPlay()) return;
+      const ms = performance.now();
+      if (ms - this.lastShotMs < 42) return;
+      this.lastShotMs = ms;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const base = 360 + tier * 55;
+      osc.type = tier >= 5 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(base, now);
+      osc.frequency.exponentialRampToValueAtTime(base * 0.52, now + 0.065);
+      g.gain.setValueAtTime(0.045, now);
+      g.gain.exponentialRampToValueAtTime(0.0008, now + 0.07);
+      osc.connect(g); g.connect(this.master);
+      osc.start(now); osc.stop(now + 0.075);
+    },
+    playMerge(tier) {
+      if (!this.canPlay()) return;
+      const now = this.ctx.currentTime;
+      const f1 = 330 * Math.pow(1.12, tier);
+      [f1, f1 * 1.25, f1 * 1.5].forEach((f, idx) => {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'triangle';
+        const st = now + idx * 0.045;
+        osc.frequency.setValueAtTime(f, st);
+        g.gain.setValueAtTime(0.07, st);
+        g.gain.exponentialRampToValueAtTime(0.0008, st + 0.14);
+        osc.connect(g); g.connect(this.master);
+        osc.start(st); osc.stop(st + 0.15);
+      });
+    },
+    playBoom() {
+      if (!this.canPlay()) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(145, now);
+      osc.frequency.exponentialRampToValueAtTime(34, now + 0.28);
+      g.gain.setValueAtTime(0.14, now);
+      g.gain.exponentialRampToValueAtTime(0.0008, now + 0.3);
+      osc.connect(g); g.connect(this.master);
+      osc.start(now); osc.stop(now + 0.31);
+    }
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (!AudioSys.ctx) return;
+    if (document.hidden) AudioSys.ctx.suspend().catch(() => {});
+    else if (!SDKBridge.isAdActive()) AudioSys.ctx.resume().catch(() => {});
+  });
+
+  // --- Turret Tiers (Lv.1 to Lv.8) ---
+  const TURRETS = [
+    null,
+    { lv: 1, name: 'Pulse', color: '#38BDF8', rim: '#BAE6FD', cd: 0.72, dmg: 12, kind: 'single' },
+    { lv: 2, name: 'Twin', color: '#0EA5E9', rim: '#7DD3FC', cd: 0.56, dmg: 16, kind: 'twin' },
+    { lv: 3, name: 'Cryo', color: '#2DD4BF', rim: '#99F6E4', cd: 0.68, dmg: 26, kind: 'cryo' },
+    { lv: 4, name: 'Mortar', color: '#F59E0B', rim: '#FDE68A', cd: 1.05, dmg: 62, kind: 'aoe' },
+    { lv: 5, name: 'Rail', color: '#EC4899', rim: '#FBCFE8', cd: 0.88, dmg: 85, kind: 'pierce' },
+    { lv: 6, name: 'Tesla', color: '#A855F7', rim: '#E9D5FF', cd: 0.74, dmg: 115, kind: 'chain' },
+    { lv: 7, name: 'Plasma', color: '#10B981', rim: '#A7F3D0', cd: 0.66, dmg: 195, kind: 'burn' },
+    { lv: 8, name: 'Orbital', color: '#EF4444', rim: '#FDE047', cd: 0.54, dmg: 380, kind: 'orbital' }
+  ];
+
+  const ARMORY_DEFS = [
+    { key: 'wall', name: 'Bastion Plating', max: 10, base: 10, step: 8, desc: lv => `+${lv * 25} Max Bastion HP (Next: +25 HP)` },
+    { key: 'gold', name: 'War Chest', max: 10, base: 12, step: 10, desc: lv => `+${lv * 25} Starting Gold (Next: +25 🪙)` },
+    { key: 'disc', name: 'Forge Discount', max: 8, base: 15, step: 12, desc: lv => `-${lv * 5}% Turret Spawn Cost (Next: -5%)` },
+    { key: 'pow', name: 'Plasma Calibration', max: 12, base: 14, step: 12, desc: lv => `+${lv * 12}% All Turret Damage (Next: +12%)` },
+    { key: 'idle', name: 'Idle Core Reactor', max: 8, base: 16, step: 14, desc: lv => `Generates +${2 + lv * 2} Cores/hr while away` }
+  ];
+
+  // --- Persistent Save State ---
+  const meta = {
+    bestScore: 0,
+    bestWave: 1,
+    cores: 0,
+    upg: { wall: 0, gold: 0, disc: 0, pow: 0, idle: 0 },
+    lastSeenMs: Date.now(),
+    lastDailyDay: ''
+  };
+
+  function mergeMeta(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if (typeof obj.bestScore === 'number') meta.bestScore = Math.max(meta.bestScore, obj.bestScore);
+    if (typeof obj.bestWave === 'number') meta.bestWave = Math.max(meta.bestWave, obj.bestWave);
+    if (typeof obj.cores === 'number') meta.cores = Math.max(meta.cores, obj.cores);
+    if (obj.upg && typeof obj.upg === 'object') {
+      Object.keys(meta.upg).forEach(k => {
+        if (typeof obj.upg[k] === 'number') meta.upg[k] = Math.max(meta.upg[k], obj.upg[k]);
+      });
+    }
+    if (typeof obj.lastSeenMs === 'number') meta.lastSeenMs = obj.lastSeenMs;
+    if (typeof obj.lastDailyDay === 'string') meta.lastDailyDay = obj.lastDailyDay;
+  }
+
+  function persistMeta() {
+    meta.lastSeenMs = Date.now();
+    SDKBridge.saveData(JSON.stringify(meta));
+    updateArmoryGlow();
+  }
+
+  // --- Grid & Layout ---
+  const ROWS = 5;
+  const COLS = 8;
+  const BENCH_SLOTS = 4;
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+
+  const layout = {
+    cell: 56,
+    gridX: 0, gridY: 0, gridW: 0, gridH: 0,
+    wallX: 0, wallW: 24,
+    benchX: 0, benchY: 0, benchCell: 52, benchGap: 10,
+    sellRect: { x: 0, y: 0, w: 52, h: 52 }
+  };
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    const topPad = 68;
+    const botPad = 62;
+    const availW = Math.max(290, W - 36);
+    const availH = Math.max(280, H - topPad - botPad);
+
+    // Reserve height for 5 rows + bench row below
+    const cellByW = Math.floor(availW / (COLS + 0.65));
+    const cellByH = Math.floor(availH / (ROWS + 1.45));
+    layout.cell = Math.max(32, Math.min(76, Math.min(cellByW, cellByH)));
+    layout.wallW = Math.max(18, Math.floor(layout.cell * 0.42));
+    layout.gridW = layout.cell * COLS;
+    layout.gridH = layout.cell * ROWS;
+    const totalW = layout.wallW + layout.gridW;
+    layout.wallX = Math.floor((W - totalW) / 2);
+    layout.gridX = layout.wallX + layout.wallW;
+    layout.benchCell = Math.max(36, Math.min(62, Math.floor(layout.cell * 0.92)));
+    const totalVertical = layout.gridH + 14 + layout.benchCell;
+    layout.gridY = Math.floor(topPad + Math.max(4, (availH - totalVertical) / 2));
+
+    const benchTotalW = BENCH_SLOTS * layout.benchCell + (BENCH_SLOTS - 1) * layout.benchGap + 18 + layout.benchCell;
+    layout.benchX = Math.floor((W - benchTotalW) / 2);
+    layout.benchY = layout.gridY + layout.gridH + 12;
+    layout.sellRect = {
+      x: layout.benchX + BENCH_SLOTS * (layout.benchCell + layout.benchGap) + 8,
+      y: layout.benchY,
+      w: layout.benchCell,
+      h: layout.benchCell
+    };
+  }
+
+  // --- Runtime Battle State ---
+  const state = {
+    mode: 'play', // 'play' | 'pause' | 'armory' | 'boss_modal' | 'welcome' | 'over'
+    prevMode: 'play',
+    wave: 1,
+    score: 0,
+    gold: 60,
+    runCores: 0,
+    hp: 100,
+    maxHp: 100,
+    buyCount: 0,
+    fast15x: false,
+    turboTimer: 0, // 180s 2x damage & gold boost from rewarded ad
+    revivedOnce: false,
+    tutorialActive: true,
+    tutorialTime: 0,
+    waveTotalEnemies: 8,
+    waveSpawned: 0,
+    spawnTimer: 1.2,
+    pendingBossGold: 0,
+    pendingBossCores: 0,
+    pendingWelcomeCores: 0,
+    shake: 0,
+    grid: [],  // [r][c] -> { lv, cd, recoil, angle } | null
+    bench: [], // [i] -> { lv } | null
+    enemies: [],
+    bullets: [],
+    beams: [],
+    rings: [],
+    particles: [],
+    popups: [],
+    drag: null // { srcType: 'grid'|'bench', r, c, idx, unit, x, y }
+  };
+
+  function getBuyCost() {
+    const disc = 1 - (meta.upg.disc || 0) * 0.05;
+    const raw = 20 + state.buyCount * 6 + Math.floor(Math.pow(state.buyCount, 1.28) * 2);
+    return Math.max(10, Math.round(raw * disc));
+  }
+
+  function getDamageMult() {
+    const armoryMult = 1 + (meta.upg.pow || 0) * 0.12;
+    const turboMult = state.turboTimer > 0 ? 2 : 1;
+    return armoryMult * turboMult;
+  }
+
+  // --- HUD Sync ---
+  const hudWave = document.getElementById('hud-wave');
+  const hudGold = document.getElementById('hud-gold');
+  const hudHp = document.getElementById('hud-hp');
+  const hudCores = document.getElementById('hud-cores');
+  const buyCostEl = document.getElementById('buy-cost');
+  const btnBuy = document.getElementById('btn-buy');
+  const btnTurbo = document.getElementById('btn-turbo');
+  const btnArmory = document.getElementById('btn-armory');
+  const btnSpeed = document.getElementById('btn-speed');
+  const btnBgm = document.getElementById('btn-bgm');
+  const btnSfx = document.getElementById('btn-sfx');
+
+  function updateArmoryGlow() {
+    const affordable = ARMORY_DEFS.some(d => {
+      const lv = meta.upg[d.key] || 0;
+      return lv < d.max && meta.cores >= d.base + lv * d.step;
+    });
+    btnArmory.classList.toggle('glow', affordable);
+  }
+
+  function syncHUD() {
+    hudWave.textContent = state.wave;
+    hudGold.textContent = Math.floor(state.gold);
+    hudHp.textContent = `${Math.max(0, Math.ceil(state.hp))}/${state.maxHp}`;
+    hudCores.textContent = meta.cores;
+    const cost = getBuyCost();
+    buyCostEl.textContent = `${cost} 🪙`;
+    btnBuy.classList.toggle('disabled', state.gold < cost);
+    if (state.turboTimer > 0) {
+      btnTurbo.textContent = `⚡ 2x (${Math.ceil(state.turboTimer)}s)`;
+    } else {
+      btnTurbo.textContent = '🎬 Turbo 2x';
+    }
+  }
+
+  function syncAudioBtns() {
+    btnBgm.textContent = AudioSys.bgmMuted ? 'BGM: OFF' : 'BGM: ON';
+    btnSfx.textContent = AudioSys.sfxMuted ? 'SFX: OFF' : 'SFX: ON';
+  }
+
+  // --- Initialize / Reset Run ---
+  function initBattle(showTutorialIfWave1) {
+    state.mode = 'play';
+    state.wave = 1;
+    state.score = 0;
+    state.runCores = 0;
+    state.maxHp = 100 + (meta.upg.wall || 0) * 25;
+    state.hp = state.maxHp;
+    state.gold = 60 + (meta.upg.gold || 0) * 25;
+    state.buyCount = 0;
+    state.revivedOnce = false;
+    state.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    state.bench = Array(BENCH_SLOTS).fill(null);
+    state.enemies = [];
+    state.bullets = [];
+    state.beams = [];
+    state.rings = [];
+    state.particles = [];
+    state.popups = [];
+    state.drag = null;
+
+    // Pre-place 2 Lv.1 turrets so player can merge within <3 seconds!
+    state.grid[2][1] = { lv: 1, cd: 0.2, recoil: 0, angle: 0 };
+    state.grid[2][3] = { lv: 1, cd: 0.3, recoil: 0, angle: 0 };
+    state.tutorialActive = !!showTutorialIfWave1;
+    state.tutorialTime = 0;
+
+    setupWave(1);
+    document.querySelectorAll('.overlay').forEach(el => el.classList.remove('show'));
+    syncHUD();
+    updateArmoryGlow();
+    SDKBridge.gameplayStart();
+  }
+
+  function setupWave(w) {
+    state.wave = w;
+    if (w > meta.bestWave) meta.bestWave = w;
+    state.waveSpawned = 0;
+    const isBoss = (w % 5 === 0);
+    state.waveTotalEnemies = isBoss ? (6 + Math.floor(w * 1.1)) : (6 + Math.floor(w * 1.45));
+    state.spawnTimer = w === 1 ? 2.2 : 0.9;
+    SDKBridge.reportScoreAndWave(state.score, state.wave);
+    syncHUD();
+  }
+
+  // --- Spawning Turrets & Merging ---
+  function spawnTurret() {
+    if (state.mode !== 'play') return;
+    AudioSys.unlock();
+    const cost = getBuyCost();
+    if (state.gold < cost) {
+      showToast('Need more Gold — defeat enemies!');
+      return;
+    }
+
+    // Prefer empty bench slot first, then leftmost empty grid cell
+    let placed = false;
+    for (let i = 0; i < BENCH_SLOTS; i++) {
+      if (!state.bench[i]) {
+        state.bench[i] = { lv: 1 };
+        const bx = layout.benchX + i * (layout.benchCell + layout.benchGap) + layout.benchCell / 2;
+        const by = layout.benchY + layout.benchCell / 2;
+        emitRing(bx, by, layout.benchCell * 0.7, '#38BDF8');
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      outer: for (let c = 0; c < COLS - 2; c++) {
+        for (let r = 0; r < ROWS; r++) {
+          if (!state.grid[r][c]) {
+            state.grid[r][c] = { lv: 1, cd: 0.15, recoil: 0, angle: 0 };
+            const gx = layout.gridX + (c + 0.5) * layout.cell;
+            const gy = layout.gridY + (r + 0.5) * layout.cell;
+            emitRing(gx, gy, layout.cell * 0.7, '#38BDF8');
+            placed = true;
+            break outer;
+          }
+        }
+      }
+    }
+
+    if (!placed) {
+      showToast('Grid & Bench full — Merge turrets first!');
+      return;
+    }
+
+    state.gold -= cost;
+    state.buyCount++;
+    AudioSys.playMerge(1);
+    syncHUD();
+  }
+
+  function quickAutoMerge() {
+    if (state.mode !== 'play') return;
+    AudioSys.unlock();
+    // Collect all units from bench & grid
+    const list = [];
+    for (let i = 0; i < BENCH_SLOTS; i++) {
+      if (state.bench[i] && state.bench[i].lv < 8) list.push({ loc: 'bench', i, lv: state.bench[i].lv });
+    }
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (state.grid[r][c] && state.grid[r][c].lv < 8) list.push({ loc: 'grid', r, c, lv: state.grid[r][c].lv });
+      }
+    }
+    for (let a = 0; a < list.length; a++) {
+      for (let b = a + 1; b < list.length; b++) {
+        if (list[a].lv === list[b].lv) {
+          // Merge 'a' into 'b' (prefer keeping on grid)
+          const src = list[a].loc === 'bench' ? list[a] : list[b];
+          const dst = src === list[a] ? list[b] : list[a];
+          if (src.loc === 'bench') state.bench[src.i] = null;
+          else state.grid[src.r][src.c] = null;
+
+          const nextLv = dst.lv + 1;
+          let fxX = 0, fxY = 0;
+          if (dst.loc === 'bench') {
+            state.bench[dst.i] = { lv: nextLv };
+            fxX = layout.benchX + dst.i * (layout.benchCell + layout.benchGap) + layout.benchCell / 2;
+            fxY = layout.benchY + layout.benchCell / 2;
+          } else {
+            state.grid[dst.r][dst.c] = { lv: nextLv, cd: 0.1, recoil: 0, angle: 0 };
+            fxX = layout.gridX + (dst.c + 0.5) * layout.cell;
+            fxY = layout.gridY + (dst.r + 0.5) * layout.cell;
+          }
+          onTurretMerged(nextLv, fxX, fxY);
+          return;
+        }
+      }
+    }
+    showToast('No matching turret pair to merge');
+  }
+
+  function onTurretMerged(newLv, x, y) {
+    state.tutorialActive = false;
+    AudioSys.playMerge(newLv);
+    const tDef = TURRETS[newLv];
+    emitRing(x, y, layout.cell * 1.15, tDef.rim);
+    emitParticles(x, y, tDef.color, 18);
+    addPopup(x, y - 10, `LV.${newLv} ${tDef.name.toUpperCase()}!`, tDef.rim);
+    state.score += newLv * 25;
+    if (state.score > meta.bestScore) meta.bestScore = state.score;
+    if (newLv >= 6) SDKBridge.happyTime();
+    syncHUD();
+  }
+
+  // --- Enemy Spawning ---
+  function spawnEnemy(forceBoss) {
+    const w = state.wave;
+    const lane = forceBoss ? 2 : Math.floor(Math.random() * ROWS);
+    const startX = layout.gridX + layout.gridW + layout.cell * 0.45;
+    const baseScale = Math.pow(1.21, w - 1);
+
+    if (forceBoss) {
+      const hp = Math.round(480 * baseScale);
+      state.enemies.push({
+        kind: 'boss', lane,
+        x: startX,
+        hp, maxHp: hp, shield: Math.round(hp * 0.25), maxShield: Math.round(hp * 0.25),
+        spd: layout.cell * 0.26,
+        gold: 90 + w * 18,
+        dmg: 45,
+        slowT: 0, burnT: 0, burnDps: 0, flash: 0, rScale: 0.44
+      });
+      showToast(`⚠️ BOSS DREADNOUGHT INCOMING — WAVE ${w}!`);
+      return;
+    }
+
+    const roll = Math.random();
+    if (w >= 2 && roll < 0.2) {
+      // Swarm of 3 nimble mites
+      for (let m = 0; m < 3; m++) {
+        const hp = Math.round(16 * baseScale);
+        state.enemies.push({
+          kind: 'swarm', lane: (lane + m) % ROWS,
+          x: startX + m * 22,
+          hp, maxHp: hp, shield: 0, maxShield: 0,
+          spd: layout.cell * 0.72,
+          gold: 4 + Math.floor(w * 0.6),
+          dmg: 6, slowT: 0, burnT: 0, burnDps: 0, flash: 0, rScale: 0.22
+        });
+      }
+    } else if (w >= 3 && roll < 0.4) {
+      // Armored Tank
+      const hp = Math.round(78 * baseScale);
+      state.enemies.push({
+        kind: 'tank', lane, x: startX,
+        hp, maxHp: hp, shield: 0, maxShield: 0,
+        spd: layout.cell * 0.34,
+        gold: 14 + w * 2,
+        dmg: 18, slowT: 0, burnT: 0, burnDps: 0, flash: 0, rScale: 0.34
+      });
+    } else if (w >= 4 && roll < 0.58) {
+      // Aegis Shielder
+      const hp = Math.round(42 * baseScale);
+      const sh = Math.round(36 * baseScale);
+      state.enemies.push({
+        kind: 'shield', lane, x: startX,
+        hp, maxHp: hp, shield: sh, maxShield: sh,
+        spd: layout.cell * 0.48,
+        gold: 12 + w * 2,
+        dmg: 12, slowT: 0, burnT: 0, burnDps: 0, flash: 0, rScale: 0.29
+      });
+    } else if (w >= 5 && roll < 0.74) {
+      // Bio-Regenerator
+      const hp = Math.round(54 * baseScale);
+      state.enemies.push({
+        kind: 'regen', lane, x: startX,
+        hp, maxHp: hp, shield: 0, maxShield: 0,
+        spd: layout.cell * 0.46,
+        gold: 13 + w * 2,
+        dmg: 14, slowT: 0, burnT: 0, burnDps: 0, flash: 0, rScale: 0.29
+      });
+    } else {
+      // Fast Scout
+      const hp = Math.round(30 * baseScale);
+      state.enemies.push({
+        kind: 'scout', lane, x: startX,
+        hp, maxHp: hp, shield: 0, maxShield: 0,
+        spd: layout.cell * 0.58,
+        gold: 7 + Math.floor(w * 1.3),
+        dmg: 10, slowT: 0, burnT: 0, burnDps: 0, flash: 0, rScale: 0.26
+      });
+    }
+  }
+
+  // --- FX Helpers ---
+  function emitRing(x, y, maxR, color) {
+    state.rings.push({ x, y, r: 6, maxR, color, life: 0.3, maxLife: 0.3 });
+  }
+  function emitParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = 45 + Math.random() * 170;
+      state.particles.push({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        r: 1.8 + Math.random() * 2.8, color, life: 0.32 + Math.random() * 0.25, maxLife: 0.57
+      });
+    }
+  }
+  function addPopup(x, y, text, color) {
+    state.popups.push({ x, y, text, color, life: 0.78 });
+  }
+
+  function applyDamage(en, rawDmg, opts = {}) {
+    if (en.hp <= 0) return;
+    let rem = rawDmg;
+    const ey = layout.gridY + (en.lane + 0.5) * layout.cell;
+    if (en.shield > 0) {
+      const absorbed = Math.min(en.shield, rem);
+      en.shield -= absorbed;
+      rem -= absorbed;
+    }
+    if (rem > 0) en.hp -= rem;
+    en.flash = 1;
+    if (opts.slow) en.slowT = Math.max(en.slowT, 2.2);
+    if (opts.burnDps) { en.burnT = 3.0; en.burnDps = Math.max(en.burnDps, opts.burnDps); }
+
+    if (opts.showNum) {
+      addPopup(en.x + (Math.random() - 0.5) * 10, ey - 14, `-${Math.round(rawDmg)}`, opts.color || '#F8FAFC');
+    }
+
+    if (en.hp <= 0) {
+      const goldMult = state.turboTimer > 0 ? 2 : 1;
+      const earned = Math.round(en.gold * goldMult);
+      state.gold += earned;
+      state.score += en.kind === 'boss' ? 500 : 20;
+      if (state.score > meta.bestScore) meta.bestScore = state.score;
+      emitParticles(en.x, ey, en.kind === 'boss' ? '#FBBF24' : '#38BDF8', en.kind === 'boss' ? 36 : 10);
+      emitRing(en.x, ey, layout.cell * (en.kind === 'boss' ? 2.2 : 0.75), en.kind === 'boss' ? '#FDE047' : '#38BDF8');
+
+      if (en.kind === 'boss') {
+        AudioSys.playBoom();
+        state.shake = 14;
+        const bossCores = 5 + Math.floor(state.wave / 5) * 3;
+        meta.cores += bossCores;
+        state.runCores += bossCores;
+        persistMeta();
+        SDKBridge.happyTime();
+        // Store pending bonus for Boss Modal when wave finishes
+        state.pendingBossGold = earned;
+        state.pendingBossCores = bossCores;
+      }
+      syncHUD();
+    }
+  }
+
+  // --- Combat Step ---
+  function fireTurret(r, c, unit) {
+    const tDef = TURRETS[unit.lv];
+    const tx = layout.gridX + (c + 0.5) * layout.cell;
+    const ty = layout.gridY + (r + 0.5) * layout.cell;
+
+    // Find closest enemy ahead in same lane (or any lane for Tesla/Orbital)
+    let target = null;
+    let bestX = Infinity;
+    for (let i = 0; i < state.enemies.length; i++) {
+      const en = state.enemies[i];
+      if (en.hp <= 0) continue;
+      const sameLane = en.lane === r;
+      const crossLaneOk = (tDef.kind === 'chain' || tDef.kind === 'orbital') && Math.abs(en.lane - r) <= 1;
+      if ((sameLane || crossLaneOk) && en.x >= tx - 10 && en.x < bestX) {
+        bestX = en.x;
+        target = en;
+      }
+    }
+    if (!target) return false;
+
+    const ey = layout.gridY + (target.lane + 0.5) * layout.cell;
+    unit.angle = Math.atan2(ey - ty, target.x - tx);
+    unit.recoil = 5;
+    AudioSys.playShot(unit.lv);
+
+    const dmg = tDef.dmg * getDamageMult();
+
+    if (tDef.kind === 'pierce') {
+      // Instant railgun beam across the entire row!
+      state.beams.push({ x1: tx + 10, y1: ty, x2: layout.gridX + layout.gridW + 20, y2: ty, color: tDef.color, life: 0.14 });
+      let hits = 0;
+      state.enemies.forEach(en => {
+        if (en.hp > 0 && en.lane === r && en.x >= tx && hits < 4) {
+          hits++;
+          applyDamage(en, dmg, { showNum: true, color: tDef.rim });
+        }
+      });
+      return true;
+    }
+
+    if (tDef.kind === 'chain') {
+      // Tesla chain lightning up to 3 enemies
+      const pool = state.enemies
+        .filter(e => e.hp > 0 && Math.abs(e.lane - r) <= 2)
+        .sort((a, b) => Math.hypot(a.x - target.x, (a.lane - target.lane) * layout.cell) - Math.hypot(b.x - target.x, (b.lane - target.lane) * layout.cell))
+        .slice(0, 3);
+      let px = tx, py = ty;
+      pool.forEach((en, idx) => {
+        const ny = layout.gridY + (en.lane + 0.5) * layout.cell;
+        state.beams.push({ x1: px, y1: py, x2: en.x, y2: ny, color: '#C084FC', life: 0.15 });
+        applyDamage(en, dmg * Math.pow(0.82, idx), { showNum: true, color: '#E9D5FF' });
+        px = en.x; py = ny;
+      });
+      return true;
+    }
+
+    if (tDef.kind === 'orbital') {
+      // Devastating Ion Strike + splash
+      state.beams.push({ x1: tx, y1: ty, x2: target.x, y2: ey, color: '#FDE047', life: 0.16 });
+      emitRing(target.x, ey, layout.cell * 1.1, '#EF4444');
+      state.enemies.forEach(en => {
+        if (en.hp <= 0) return;
+        const ny = layout.gridY + (en.lane + 0.5) * layout.cell;
+        if (Math.hypot(en.x - target.x, ny - ey) <= layout.cell * 1.15) {
+          applyDamage(en, dmg, { showNum: en === target, color: '#FDE047' });
+        }
+      });
+      return true;
+    }
+
+    const mkBullet = (offY) => {
+      state.bullets.push({
+        x: tx + 10, y: ty + offY,
+        vx: Math.cos(unit.angle) * layout.cell * 10.5,
+        vy: Math.sin(unit.angle) * layout.cell * 10.5,
+        dmg: tDef.kind === 'twin' ? dmg * 0.62 : dmg,
+        color: tDef.color,
+        kind: tDef.kind,
+        lane: r
+      });
+    };
+
+    if (tDef.kind === 'twin') { mkBullet(-5); mkBullet(5); }
+    else mkBullet(0);
+    return true;
+  }
+
+  function update(rawDt) {
+    if (state.mode !== 'play') return;
+
+    const spdMult = (state.fast15x ? 1.65 : 1) * (state.turboTimer > 0 ? 1.35 : 1);
+    const dt = rawDt * spdMult;
+
+    if (state.turboTimer > 0) {
+      state.turboTimer = Math.max(0, state.turboTimer - rawDt);
+      if (Math.floor(state.turboTimer) !== Math.floor(state.turboTimer + rawDt)) syncHUD();
+    }
+    if (state.tutorialActive) state.tutorialTime += rawDt;
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - rawDt * 30);
+
+    // Wave enemy spawning
+    if (state.waveSpawned < state.waveTotalEnemies) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        const isLastAndBoss = (state.wave % 5 === 0) && (state.waveSpawned === state.waveTotalEnemies - 1);
+        spawnEnemy(isLastAndBoss);
+        state.waveSpawned++;
+        state.spawnTimer = Math.max(0.55, 1.65 - state.wave * 0.04);
+      }
+    }
+
+    // Turrets fire
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const u = state.grid[r][c];
+        if (!u) continue;
+        if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 22);
+        u.cd -= dt;
+        if (u.cd <= 0) {
+          if (fireTurret(r, c, u)) u.cd = TURRETS[u.lv].cd;
+          else u.cd = 0.12;
+        }
+      }
+    }
+
+    // Bullets
+    for (let i = state.bullets.length - 1; i >= 0; i--) {
+      const b = state.bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.x > layout.gridX + layout.gridW + 50 || b.y < 0 || b.y > H) {
+        state.bullets.splice(i, 1);
+        continue;
+      }
+      for (let k = 0; k < state.enemies.length; k++) {
+        const en = state.enemies[k];
+        if (en.hp <= 0) continue;
+        const ey = layout.gridY + (en.lane + 0.5) * layout.cell;
+        const er = layout.cell * en.rScale;
+        if (Math.hypot(b.x - en.x, b.y - ey) <= er + 6) {
+          if (b.kind === 'aoe') {
+            AudioSys.playBoom();
+            emitRing(b.x, b.y, layout.cell * 1.15, '#FBBF24');
+            state.enemies.forEach(other => {
+              if (other.hp <= 0) return;
+              const oy = layout.gridY + (other.lane + 0.5) * layout.cell;
+              if (Math.hypot(other.x - b.x, oy - b.y) <= layout.cell * 1.2) {
+                applyDamage(other, b.dmg, { showNum: other === en, color: '#FDE68A' });
+              }
+            });
+          } else {
+            applyDamage(en, b.dmg, {
+              slow: b.kind === 'cryo',
+              burnDps: b.kind === 'burn' ? b.dmg * 0.35 : 0,
+              showNum: true,
+              color: b.color
+            });
+          }
+          state.bullets.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    // Enemies advance
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+      const en = state.enemies[i];
+      if (en.hp <= 0) { state.enemies.splice(i, 1); continue; }
+
+      if (en.flash > 0) en.flash = Math.max(0, en.flash - dt * 6);
+      if (en.slowT > 0) en.slowT = Math.max(0, en.slowT - dt);
+      if (en.burnT > 0) {
+        en.burnT = Math.max(0, en.burnT - dt);
+        applyDamage(en, en.burnDps * dt, { showNum: false });
+        if (en.hp <= 0) { state.enemies.splice(i, 1); continue; }
+      }
+      if (en.kind === 'regen' && en.hp < en.maxHp) {
+        en.hp = Math.min(en.maxHp, en.hp + en.maxHp * 0.05 * dt);
+      }
+
+      const slowFactor = en.slowT > 0 ? 0.55 : 1;
+      en.x -= en.spd * slowFactor * dt;
+
+      // Breach Bastion Wall!
+      if (en.x <= layout.gridX + 6) {
+        state.hp -= en.dmg;
+        state.shake = 10;
+        AudioSys.playBoom();
+        const ey = layout.gridY + (en.lane + 0.5) * layout.cell;
+        emitParticles(layout.gridX, ey, '#FB7185', 14);
+        state.enemies.splice(i, 1);
+        syncHUD();
+        if (state.hp <= 0) {
+          triggerGameOver();
+          return;
+        }
+      }
+    }
+
+    // FX cleanup
+    for (let i = state.beams.length - 1; i >= 0; i--) {
+      state.beams[i].life -= rawDt;
+      if (state.beams[i].life <= 0) state.beams.splice(i, 1);
+    }
+    for (let i = state.rings.length - 1; i >= 0; i--) {
+      const rg = state.rings[i];
+      rg.life -= rawDt;
+      rg.r += (rg.maxR - rg.r) * Math.min(1, rawDt * 12);
+      if (rg.life <= 0) state.rings.splice(i, 1);
+    }
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += p.vx * rawDt; p.y += p.vy * rawDt;
+      p.life -= rawDt;
+      if (p.life <= 0) state.particles.splice(i, 1);
+    }
+    for (let i = state.popups.length - 1; i >= 0; i--) {
+      const pop = state.popups[i];
+      pop.y -= 34 * rawDt;
+      pop.life -= rawDt;
+      if (pop.life <= 0) state.popups.splice(i, 1);
+    }
+
+    // Wave Cleared Check
+    if (state.waveSpawned >= state.waveTotalEnemies && state.enemies.length === 0) {
+      const waveCores = 2 + Math.floor(state.wave / 3);
+      meta.cores += waveCores;
+      state.runCores += waveCores;
+      persistMeta();
+
+      if (state.wave % 5 === 0 && state.pendingBossGold > 0) {
+        openBossModal();
+      } else {
+        addPopup(layout.gridX + layout.gridW / 2, layout.gridY + 24, `WAVE ${state.wave} CLEARED! +${waveCores} 💠`, '#E879F9');
+        setupWave(state.wave + 1);
+      }
+    }
+  }
+
+  // --- Modals & Monetization ---
+  function openBossModal() {
+    state.mode = 'boss_modal';
+    SDKBridge.gameplayStop();
+    document.getElementById('boss-title').textContent = `WAVE ${state.wave} BOSS DEFEATED!`;
+    document.getElementById('boss-reward-txt').textContent = `+${state.pendingBossGold} 🪙 & +${state.pendingBossCores} 💠`;
+    document.getElementById('boss-overlay').classList.add('show');
+  }
+
+  document.getElementById('btn-boss-double').addEventListener('click', () => {
+    SDKBridge.showRewardedAd(ok => {
+      if (!ok) { showToast('Ad unavailable right now'); return; }
+      state.gold += state.pendingBossGold;
+      meta.cores += state.pendingBossCores;
+      state.runCores += state.pendingBossCores;
+      persistMeta();
+      syncHUD();
+      showToast(`DOUBLED! +${state.pendingBossGold} 🪙 & +${state.pendingBossCores} 💠`);
+      document.getElementById('boss-overlay').classList.remove('show');
+      state.pendingBossGold = 0;
+      state.mode = 'play';
+      setupWave(state.wave + 1);
+      SDKBridge.gameplayStart();
+    });
+  });
+
+  document.getElementById('btn-boss-claim').addEventListener('click', () => {
+    document.getElementById('boss-overlay').classList.remove('show');
+    state.pendingBossGold = 0;
+    SDKBridge.showMidgameAd(() => {
+      state.mode = 'play';
+      setupWave(state.wave + 1);
+      SDKBridge.gameplayStart();
+    });
+  });
+
+  function triggerGameOver() {
+    state.mode = 'over';
+    SDKBridge.gameplayStop();
+    persistMeta();
+    SDKBridge.reportScoreAndWave(state.score, state.wave);
+    document.getElementById('over-wave').textContent = state.wave;
+    document.getElementById('over-score').textContent = state.score;
+    document.getElementById('over-best').textContent = meta.bestScore;
+    document.getElementById('over-cores').textContent = `+${state.runCores} 💠`;
+    document.getElementById('btn-revive').style.display = state.revivedOnce ? 'none' : 'flex';
+    document.getElementById('over-overlay').classList.add('show');
+  }
+
+  document.getElementById('btn-revive').addEventListener('click', () => {
+    SDKBridge.showRewardedAd(ok => {
+      if (!ok) { showToast('Ad unavailable right now'); return; }
+      state.revivedOnce = true;
+      state.hp = Math.round(state.maxHp * 0.5);
+      state.enemies = [];
+      emitRing(layout.gridX + layout.gridW / 2, layout.gridY + layout.gridH / 2, layout.gridW * 0.7, '#38BDF8');
+      document.getElementById('over-overlay').classList.remove('show');
+      state.mode = 'play';
+      syncHUD();
+      SDKBridge.gameplayStart();
+      showToast('⚡ EMP BLAST! Lanes cleared & 50% Bastion HP restored!');
+    });
+  });
+
+  document.getElementById('btn-play-again').addEventListener('click', () => {
+    SDKBridge.showMidgameAd(() => initBattle(false));
+  });
+
+  btnTurbo.addEventListener('click', () => {
+    if (state.turboTimer > 10) {
+      showToast(`Turbo 2x already active (${Math.ceil(state.turboTimer)}s left)`);
+      return;
+    }
+    SDKBridge.showRewardedAd(ok => {
+      if (!ok) { showToast('Ad unavailable right now'); return; }
+      state.turboTimer = 180;
+      SDKBridge.happyTime();
+      syncHUD();
+      showToast('🔥 TURBO 2x DAMAGE & GOLD ACTIVE FOR 3 MINUTES!');
+    });
+  });
+
+  // --- Armory Modal ---
+  function renderArmory() {
+    document.getElementById('armory-cores-val').textContent = `${meta.cores} 💠`;
+    const list = document.getElementById('armory-list');
+    list.innerHTML = '';
+    ARMORY_DEFS.forEach(d => {
+      const lv = meta.upg[d.key] || 0;
+      const maxed = lv >= d.max;
+      const cost = d.base + lv * d.step;
+      const row = document.createElement('div');
+      row.className = 'armory-item';
+      row.innerHTML = `<div><div class="t">${d.name} <span style="color:#38BDF8;font-size:11px;">Lv.${lv}/${d.max}</span></div><div class="d">${d.desc(lv)}</div></div>`;
+      const btn = document.createElement('button');
+      btn.className = 'buy-core-btn';
+      if (maxed) {
+        btn.textContent = 'MAX';
+        btn.disabled = true;
+      } else {
+        btn.textContent = `${cost} 💠`;
+        btn.disabled = meta.cores < cost;
+        btn.addEventListener('click', () => {
+          if (meta.cores < cost) return;
+          meta.cores -= cost;
+          meta.upg[d.key] = lv + 1;
+          if (d.key === 'wall') { state.maxHp += 25; state.hp += 25; }
+          if (d.key === 'gold') { state.gold += 25; }
+          AudioSys.playMerge(3);
+          persistMeta();
+          syncHUD();
+          renderArmory();
+        });
+      }
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+
+  function openArmory(fromMode) {
+    state.prevMode = fromMode;
+    state.mode = 'armory';
+    SDKBridge.gameplayStop();
+    document.getElementById('pause-overlay').classList.remove('show');
+    document.getElementById('over-overlay').classList.remove('show');
+    renderArmory();
+    document.getElementById('armory-overlay').classList.add('show');
+  }
+
+  btnArmory.addEventListener('click', () => { if (state.mode === 'play') openArmory('play'); });
+  document.getElementById('btn-pause-armory').addEventListener('click', () => openArmory('pause'));
+  document.getElementById('btn-over-armory').addEventListener('click', () => openArmory('over'));
+  document.getElementById('btn-armory-close').addEventListener('click', () => {
+    document.getElementById('armory-overlay').classList.remove('show');
+    if (state.prevMode === 'over') {
+      state.mode = 'over';
+      document.getElementById('over-overlay').classList.add('show');
+    } else if (state.prevMode === 'pause') {
+      state.mode = 'pause';
+      document.getElementById('pause-overlay').classList.add('show');
+    } else {
+      state.mode = 'play';
+      SDKBridge.gameplayStart();
+    }
+  });
+
+  // --- Pause & Controls ---
+  function togglePause() {
+    if (state.mode === 'play') {
+      state.mode = 'pause';
+      SDKBridge.gameplayStop();
+      document.getElementById('pause-overlay').classList.add('show');
+    } else if (state.mode === 'pause') {
+      document.getElementById('pause-overlay').classList.remove('show');
+      state.mode = 'play';
+      SDKBridge.gameplayStart();
+    }
+  }
+
+  document.getElementById('btn-pause').addEventListener('click', togglePause);
+  document.getElementById('btn-resume').addEventListener('click', togglePause);
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    SDKBridge.showMidgameAd(() => initBattle(false));
+  });
+  btnBuy.addEventListener('click', spawnTurret);
+  document.getElementById('btn-auto-merge').addEventListener('click', quickAutoMerge);
+
+  btnSpeed.addEventListener('click', () => {
+    state.fast15x = !state.fast15x;
+    btnSpeed.textContent = state.fast15x ? '2x' : '1x';
+    btnSpeed.classList.toggle('spd-on', state.fast15x);
+  });
+  btnBgm.addEventListener('click', () => { AudioSys.unlock(); AudioSys.bgmMuted = !AudioSys.bgmMuted; syncAudioBtns(); });
+  btnSfx.addEventListener('click', () => { AudioSys.unlock(); AudioSys.sfxMuted = !AudioSys.sfxMuted; syncAudioBtns(); });
+
+  window.addEventListener('keydown', e => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(e.key)) e.preventDefault();
+    const k = e.key.toLowerCase();
+    if (k === 'p' || e.key === 'Escape') togglePause();
+    else if (e.key === ' ' || k === 'b') spawnTurret();
+    else if (k === 'f') quickAutoMerge();
+    else if (k === 's') btnSpeed.click();
+    else if (k === 'm') btnSfx.click();
+  }, { passive: false });
+
+  // --- Drag & Drop Turret Merging / Repositioning / Selling ---
+  function hitTestSlot(px, py) {
+    if (px >= layout.gridX && px < layout.gridX + layout.gridW && py >= layout.gridY && py < layout.gridY + layout.gridH) {
+      return {
+        type: 'grid',
+        c: Math.floor((px - layout.gridX) / layout.cell),
+        r: Math.floor((py - layout.gridY) / layout.cell)
+      };
+    }
+    for (let i = 0; i < BENCH_SLOTS; i++) {
+      const bx = layout.benchX + i * (layout.benchCell + layout.benchGap);
+      if (px >= bx && px <= bx + layout.benchCell && py >= layout.benchY && py <= layout.benchY + layout.benchCell) {
+        return { type: 'bench', idx: i };
+      }
+    }
+    const sr = layout.sellRect;
+    if (px >= sr.x && px <= sr.x + sr.w && py >= sr.y && py <= sr.y + sr.h) {
+      return { type: 'sell' };
+    }
+    return null;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if (state.mode !== 'play') return;
+    AudioSys.unlock();
+    const hit = hitTestSlot(e.clientX, e.clientY);
+    if (!hit) return;
+    if (hit.type === 'grid' && state.grid[hit.r][hit.c]) {
+      state.drag = { srcType: 'grid', r: hit.r, c: hit.c, unit: state.grid[hit.r][hit.c], x: e.clientX, y: e.clientY };
+      state.grid[hit.r][hit.c] = null;
+    } else if (hit.type === 'bench' && state.bench[hit.idx]) {
+      state.drag = { srcType: 'bench', idx: hit.idx, unit: { lv: state.bench[hit.idx].lv, cd: 0.1, recoil: 0, angle: 0 }, x: e.clientX, y: e.clientY };
+      state.bench[hit.idx] = null;
+    }
+  });
+
+  window.addEventListener('pointermove', e => {
+    if (!state.drag) return;
+    state.drag.x = e.clientX;
+    state.drag.y = e.clientY;
+  });
+
+  window.addEventListener('pointerup', e => {
+    if (!state.drag) return;
+    const d = state.drag;
+    state.drag = null;
+    const dst = hitTestSlot(e.clientX, e.clientY);
+
+    const restoreOrigin = () => {
+      if (d.srcType === 'grid') state.grid[d.r][d.c] = d.unit;
+      else state.bench[d.idx] = { lv: d.unit.lv };
+    };
+
+    if (!dst) { restoreOrigin(); return; }
+
+    if (dst.type === 'sell') {
+      const refund = Math.max(8, Math.round(12 * Math.pow(1.8, d.unit.lv - 1)));
+      state.gold += refund;
+      addPopup(layout.sellRect.x + layout.sellRect.w / 2, layout.sellRect.y, `+${refund} 🪙`, '#FDE047');
+      syncHUD();
+      return;
+    }
+
+    if (dst.type === 'grid') {
+      const existing = state.grid[dst.r][dst.c];
+      const cx = layout.gridX + (dst.c + 0.5) * layout.cell;
+      const cy = layout.gridY + (dst.r + 0.5) * layout.cell;
+      if (!existing) {
+        state.grid[dst.r][dst.c] = d.unit;
+      } else if (existing.lv === d.unit.lv && existing.lv < 8 && !(d.srcType === 'grid' && d.r === dst.r && d.c === dst.c)) {
+        state.grid[dst.r][dst.c] = { lv: existing.lv + 1, cd: 0.08, recoil: 0, angle: 0 };
+        onTurretMerged(existing.lv + 1, cx, cy);
+      } else {
+        // Swap!
+        state.grid[dst.r][dst.c] = d.unit;
+        if (d.srcType === 'grid') state.grid[d.r][d.c] = existing;
+        else state.bench[d.idx] = { lv: existing.lv };
+      }
+      return;
+    }
+
+    if (dst.type === 'bench') {
+      const existing = state.bench[dst.idx];
+      const bx = layout.benchX + dst.idx * (layout.benchCell + layout.benchGap) + layout.benchCell / 2;
+      const by = layout.benchY + layout.benchCell / 2;
+      if (!existing) {
+        state.bench[dst.idx] = { lv: d.unit.lv };
+      } else if (existing.lv === d.unit.lv && existing.lv < 8 && !(d.srcType === 'bench' && d.idx === dst.idx)) {
+        state.bench[dst.idx] = { lv: existing.lv + 1 };
+        onTurretMerged(existing.lv + 1, bx, by);
+      } else {
+        state.bench[dst.idx] = { lv: d.unit.lv };
+        if (d.srcType === 'grid') state.grid[d.r][d.c] = { lv: existing.lv, cd: 0.15, recoil: 0, angle: 0 };
+        else state.bench[d.idx] = existing;
+      }
+    }
+  });
+
+  // --- Offline & Daily Welcome Check ---
+  function checkOfflineAndDaily() {
+    const today = new Date().toISOString().slice(0, 10);
+    const awayHrs = Math.max(0, (Date.now() - (meta.lastSeenMs || Date.now())) / 3600000);
+    let bonusCores = 0;
+    let msg = '';
+
+    if (meta.lastDailyDay && meta.lastDailyDay !== today) {
+      bonusCores += 12;
+      msg = 'Daily Defense Supply Bonus ready!';
+    }
+    if (awayHrs >= 0.25) {
+      const rate = 2 + (meta.upg.idle || 0) * 2;
+      const idleCores = Math.min(80, Math.max(2, Math.floor(awayHrs * rate)));
+      bonusCores += idleCores;
+      msg = msg || `Idle Reactor ran for ${awayHrs.toFixed(1)}h while away`;
+    }
+    meta.lastDailyDay = today;
+    persistMeta();
+
+    if (bonusCores > 0) {
+      state.pendingWelcomeCores = bonusCores;
+      state.mode = 'welcome';
+      SDKBridge.gameplayStop();
+      document.getElementById('welcome-sub').textContent = msg;
+      document.getElementById('welcome-reward-txt').textContent = `+${bonusCores} 💠 Tech Cores`;
+      document.getElementById('welcome-overlay').classList.add('show');
+    }
+  }
+
+  document.getElementById('btn-welcome-claim').addEventListener('click', () => {
+    meta.cores += state.pendingWelcomeCores;
+    state.pendingWelcomeCores = 0;
+    persistMeta(); syncHUD();
+    document.getElementById('welcome-overlay').classList.remove('show');
+    state.mode = 'play';
+    SDKBridge.gameplayStart();
+  });
+
+  document.getElementById('btn-welcome-double').addEventListener('click', () => {
+    SDKBridge.showRewardedAd(ok => {
+      const mult = ok ? 2 : 1;
+      meta.cores += state.pendingWelcomeCores * mult;
+      state.pendingWelcomeCores = 0;
+      persistMeta(); syncHUD();
+      document.getElementById('welcome-overlay').classList.remove('show');
+      state.mode = 'play';
+      SDKBridge.gameplayStart();
+    });
+  });
+
+  // --- Vector Canvas Rendering ---
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawTurretShape(x, y, size, lv, angle, recoil) {
+    const t = TURRETS[lv];
+    const r = size * 0.36;
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Base glow pad
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fill();
+    ctx.strokeStyle = t.rim;
+    ctx.lineWidth = lv >= 6 ? 2.4 : 1.6;
+    ctx.stroke();
+
+    // Rotating barrel assembly
+    ctx.save();
+    ctx.rotate(angle || 0);
+    const rec = -(recoil || 0);
+    ctx.fillStyle = t.rim;
+    if (lv === 2) {
+      roundRect(rec + 2, -6, r * 0.95, 4, 2); ctx.fill();
+      roundRect(rec + 2, 2, r * 0.95, 4, 2); ctx.fill();
+    } else if (lv >= 5) {
+      roundRect(rec + 2, -4.5, r * 1.15, 9, 3); ctx.fill();
+    } else {
+      roundRect(rec + 2, -3.5, r * 0.9, 7, 3); ctx.fill();
+    }
+    ctx.restore();
+
+    // Core turret chassis (polygon evolves by tier)
+    ctx.beginPath();
+    const sides = lv <= 2 ? 0 : (lv <= 4 ? 6 : 8);
+    if (sides === 0) {
+      ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+    } else {
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
+        const px = Math.cos(a) * r * 0.76, py = Math.sin(a) * r * 0.76;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+    ctx.fillStyle = t.color;
+    ctx.fill();
+
+    // Level number badge
+    ctx.fillStyle = '#040814';
+    ctx.font = `900 ${Math.max(10, Math.floor(size * 0.24))}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(lv), 0, 1);
+    ctx.restore();
+  }
+
+  function render(now) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (state.shake > 0.2) {
+      ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
+    }
+
+    // In-game Title & Wave Progress Bar
+    const titleY = layout.gridY - 8;
+    ctx.font = '900 12.5px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#38BDF8';
+    ctx.fillText('BASTION MERGE', layout.wallX, titleY);
+
+    const progW = Math.min(180, layout.gridW * 0.42);
+    const progX = layout.gridX + layout.gridW - progW;
+    const killed = Math.max(0, state.waveSpawned - state.enemies.length);
+    const pct = Math.min(1, killed / Math.max(1, state.waveTotalEnemies));
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    roundRect(progX, titleY - 11, progW, 7, 3.5); ctx.fill();
+    ctx.fillStyle = state.wave % 5 === 0 ? '#F43F5E' : '#38BDF8';
+    roundRect(progX, titleY - 11, progW * pct, 7, 3.5); ctx.fill();
+
+    // Bastion Energy Wall (Left Defense Barrier)
+    const hpRatio = Math.max(0, state.hp / state.maxHp);
+    roundRect(layout.wallX, layout.gridY, layout.wallW - 4, layout.gridH, 8);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)'; ctx.fill();
+    ctx.strokeStyle = hpRatio > 0.35 ? 'rgba(56, 189, 248, 0.55)' : 'rgba(244, 63, 94, 0.8)';
+    ctx.lineWidth = 2; ctx.stroke();
+
+    const fillH = Math.max(0, (layout.gridH - 8) * hpRatio);
+    roundRect(layout.wallX + 3, layout.gridY + layout.gridH - 4 - fillH, layout.wallW - 10, fillH, 5);
+    ctx.fillStyle = hpRatio > 0.35 ? '#0EA5E9' : '#F43F5E';
+    ctx.fill();
+
+    // 5x8 Tactical Defense Lanes
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = layout.gridX + c * layout.cell;
+        const y = layout.gridY + r * layout.cell;
+        ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(13, 23, 46, 0.84)' : 'rgba(9, 16, 34, 0.88)';
+        ctx.fillRect(x, y, layout.cell, layout.cell);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.11)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, layout.cell, layout.cell);
+
+        // Highlight matching turrets while dragging!
+        const u = state.grid[r][c];
+        if (state.drag && u && u.lv === state.drag.unit.lv && u.lv < 8) {
+          ctx.strokeStyle = '#FDE047';
+          ctx.lineWidth = 2.2;
+          ctx.strokeRect(x + 2, y + 2, layout.cell - 4, layout.cell - 4);
+        }
+        if (u) {
+          drawTurretShape(x + layout.cell / 2, y + layout.cell / 2, layout.cell, u.lv, u.angle, u.recoil);
+        }
+      }
+    }
+
+    // Outer Grid Frame
+    roundRect(layout.gridX, layout.gridY, layout.gridW, layout.gridH, 4);
+    ctx.strokeStyle = state.turboTimer > 0 ? 'rgba(251, 191, 36, 0.7)' : 'rgba(56, 189, 248, 0.34)';
+    ctx.lineWidth = 2; ctx.stroke();
+
+    // 4-Slot Bench Tray + Recycle/Sell Slot
+    for (let i = 0; i < BENCH_SLOTS; i++) {
+      const bx = layout.benchX + i * (layout.benchCell + layout.benchGap);
+      const by = layout.benchY;
+      roundRect(bx, by, layout.benchCell, layout.benchCell, 10);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; ctx.fill();
+      const bu = state.bench[i];
+      const matchDrag = state.drag && bu && bu.lv === state.drag.unit.lv && bu.lv < 8;
+      ctx.strokeStyle = matchDrag ? '#FDE047' : 'rgba(148, 163, 184, 0.35)';
+      ctx.lineWidth = matchDrag ? 2.4 : 1.5;
+      ctx.stroke();
+      if (bu) {
+        drawTurretShape(bx + layout.benchCell / 2, by + layout.benchCell / 2, layout.benchCell, bu.lv, 0, 0);
+      }
+    }
+
+    // Sell / Recycle Slot
+    const sr = layout.sellRect;
+    roundRect(sr.x, sr.y, sr.w, sr.h, 10);
+    ctx.fillStyle = state.drag ? 'rgba(159, 18, 57, 0.55)' : 'rgba(30, 41, 59, 0.65)';
+    ctx.fill();
+    ctx.strokeStyle = state.drag ? '#FB7185' : 'rgba(148, 163, 184, 0.25)';
+    ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#FDA4AF';
+    ctx.font = '800 10px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('SELL', sr.x + sr.w / 2, sr.y + sr.h / 2);
+
+    // Interactive Onboarding Merge Arrow (<5s visual tutorial, zero wall of text!)
+    if (state.tutorialActive && state.grid[2][1] && state.grid[2][3] && !state.drag) {
+      const x1 = layout.gridX + 1.5 * layout.cell;
+      const x2 = layout.gridX + 3.5 * layout.cell;
+      const ym = layout.gridY + 2.5 * layout.cell;
+      const t = (now * 0.0016) % 1;
+      const handX = x1 + (x2 - x1) * t;
+      ctx.save();
+      ctx.strokeStyle = '#FDE047';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(x1, ym - 18);
+      ctx.quadraticCurveTo((x1 + x2) / 2, ym - 44, x2, ym - 18);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(handX, ym - 24 - Math.sin(t * Math.PI) * 12, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#FDE047'; ctx.fill();
+      ctx.font = '900 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('DRAG TO MERGE!', (x1 + x2) / 2, ym - 42);
+      ctx.restore();
+    }
+
+    // Enemies
+    state.enemies.forEach(en => {
+      const ey = layout.gridY + (en.lane + 0.5) * layout.cell;
+      const rad = layout.cell * en.rScale;
+      ctx.save();
+      ctx.translate(en.x, ey);
+
+      let col = '#F43F5E';
+      if (en.kind === 'swarm') col = '#FB923C';
+      else if (en.kind === 'tank') col = '#DC2626';
+      else if (en.kind === 'shield') col = '#38BDF8';
+      else if (en.kind === 'regen') col = '#10B981';
+      else if (en.kind === 'boss') col = '#BE185D';
+      if (en.slowT > 0) col = '#67E8F9';
+      if (en.flash > 0.2) col = '#FFFFFF';
+
+      ctx.beginPath();
+      if (en.kind === 'scout' || en.kind === 'swarm') {
+        ctx.moveTo(-rad, 0); ctx.lineTo(0, -rad * 0.8); ctx.lineTo(rad, 0); ctx.lineTo(0, rad * 0.8);
+      } else {
+        const sides = en.kind === 'boss' ? 8 : 6;
+        for (let s = 0; s < sides; s++) {
+          const a = (s / sides) * Math.PI * 2;
+          const px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+          if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+      }
+      ctx.closePath();
+      ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = en.kind === 'boss' ? '#FDE047' : 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = en.kind === 'boss' ? 2.6 : 1.5;
+      ctx.stroke();
+
+      // Shield & HP bar
+      const bw = rad * 2.1;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(-bw / 2, -rad - 9, bw, 4);
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(-bw / 2, -rad - 9, bw * Math.max(0, en.hp / en.maxHp), 4);
+      if (en.shield > 0) {
+        ctx.fillStyle = '#38BDF8';
+        ctx.fillRect(-bw / 2, -rad - 13, bw * Math.max(0, en.shield / en.maxShield), 3);
+      }
+      ctx.restore();
+    });
+
+    // Beams
+    state.beams.forEach(bm => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, bm.life / 0.16);
+      ctx.strokeStyle = bm.color; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.restore();
+    });
+
+    // Bullets
+    state.bullets.forEach(b => {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.kind === 'aoe' ? 5.5 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF'; ctx.fill();
+      ctx.strokeStyle = b.color; ctx.lineWidth = 2; ctx.stroke();
+    });
+
+    // Rings & Particles
+    state.rings.forEach(rg => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, rg.life / rg.maxLife) * 0.75;
+      ctx.strokeStyle = rg.color; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    });
+
+    state.particles.forEach(p => {
+      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    // Dragged Turret
+    if (state.drag) {
+      drawTurretShape(state.drag.x, state.drag.y, layout.cell * 1.08, state.drag.unit.lv, 0, 0);
+    }
+
+    // Floating Damage & Merge Popups
+    state.popups.forEach(pop => {
+      ctx.globalAlpha = Math.max(0, pop.life / 0.78);
+      ctx.font = '800 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = pop.color;
+      ctx.fillText(pop.text, pop.x, pop.y);
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  // --- Boot Sequence ---
+  let lastNow = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.04, (now - lastNow) / 1000);
+    lastNow = now;
+    if (!SDKBridge.isAdActive()) update(dt);
+    render(now);
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  syncAudioBtns();
+
+  (async () => {
+    await SDKBridge.init({
+      onMuteChange: muted => AudioSys.setSdkMute(muted),
+      onPauseChange: paused => {
+        if (paused && state.mode === 'play') {
+          state.mode = 'pause';
+          document.getElementById('pause-overlay').classList.add('show');
+        }
+      }
+    });
+    const savedRaw = await SDKBridge.loadData();
+    if (savedRaw) {
+      try { mergeMeta(JSON.parse(savedRaw)); } catch (e) {}
+    }
+    initBattle(true);
+    checkOfflineAndDaily();
+    requestAnimationFrame(loop);
+  })();
+})();
+
+</script>
+</body>
+</html>

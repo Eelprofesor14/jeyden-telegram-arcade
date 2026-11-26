@@ -1,0 +1,2482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ORBIT BREAKER</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Optional Monetag / AdsGram zone tag: set window.ORBIT_MONETAG_FN or window.ORBIT_ADSGRAM_ID -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #050812;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #F8FAFC;
+    touch-action: none;
+  }
+  #game-wrap {
+    position: relative;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: #050812;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  /* Compact Single-Row HUD (certified for 821x462, 907x510, 800x450) */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 12px;
+    pointer-events: none;
+    z-index: 10;
+    gap: 6px;
+  }
+  .hud-group {
+    display: flex; gap: 5px; align-items: center; flex-wrap: nowrap;
+  }
+  .pill {
+    background: rgba(10, 16, 34, 0.86);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 9px;
+    padding: 3px 8px;
+    backdrop-filter: blur(6px);
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 48px;
+  }
+  .pill-lbl {
+    font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #94A3B8; line-height: 1.1;
+  }
+  .pill-val {
+    font-size: 14px; font-weight: 800; color: #F8FAFC;
+    font-variant-numeric: tabular-nums; line-height: 1.15;
+  }
+  .pill-val.cyan { color: #38BDF8; }
+  .pill-val.amber { color: #FBBF24; }
+  .pill-val.violet { color: #C084FC; }
+  .hud-btn {
+    pointer-events: auto;
+    background: rgba(10, 16, 34, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #F8FAFC;
+    border-radius: 9px;
+    padding: 6px 8px;
+    font-size: 11px; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .hud-btn:hover { border-color: #38BDF8; background: rgba(30, 41, 59, 0.96); }
+  .hud-btn:active { transform: scale(0.95); }
+  .hud-btn.shop-btn { border-color: rgba(192, 132, 252, 0.6); color: #E9D5FF; }
+  .hud-btn.map-btn { border-color: rgba(56, 189, 248, 0.58); color: #BAE6FD; }
+  .hud-btn.ach-btn { border-color: rgba(251, 191, 36, 0.55); color: #FDE68A; }
+
+  /* Shoot action buttons */
+  #shoot-controls {
+    position: absolute; bottom: 12px; right: 12px;
+    z-index: 12; display: none; gap: 7px; align-items: center;
+  }
+  #shoot-controls.show { display: flex; }
+  .action-btn {
+    border: none; color: #fff; padding: 8px 13px;
+    border-radius: 11px; font-weight: 700; font-size: 12px;
+    cursor: pointer; transition: transform 0.12s ease;
+  }
+  .action-btn:active { transform: scale(0.95); }
+  #speed-btn {
+    background: rgba(30, 41, 59, 0.94);
+    border: 1px solid rgba(56, 189, 248, 0.55); color: #7DD3FC;
+  }
+  #speed-btn.active {
+    background: linear-gradient(135deg, #D97706, #F59E0B);
+    border-color: #FDE68A; color: #0F172A;
+  }
+  #recall-btn {
+    background: linear-gradient(135deg, #0284C7, #0EA5E9);
+    box-shadow: 0 6px 18px rgba(14, 165, 233, 0.38);
+  }
+
+  #sector-banner {
+    position: absolute; top: 48px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 16, 34, 0.8);
+    border: 1px solid rgba(56, 189, 248, 0.32);
+    padding: 3px 11px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    color: #BAE6FD; pointer-events: none; z-index: 10;
+    white-space: nowrap;
+  }
+  #combo-badge {
+    position: absolute; top: 74px; left: 50%; transform: translateX(-50%) scale(0.9);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.96), rgba(219, 39, 119, 0.96));
+    color: #fff; font-weight: 900; font-size: 12px; letter-spacing: 0.05em;
+    padding: 4px 13px; border-radius: 999px;
+    box-shadow: 0 0 22px rgba(245, 158, 11, 0.55);
+    pointer-events: none; z-index: 11;
+    opacity: 0; transition: opacity 0.2s ease, transform 0.15s ease;
+  }
+  #combo-badge.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+  /* Achievement Toast (non-blocking) */
+  #toast {
+    position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%) translateY(14px);
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #FBBF24;
+    color: #FEF3C7; font-size: 12px; font-weight: 700;
+    padding: 7px 14px; border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+    pointer-events: none; z-index: 30;
+    opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #hint {
+    position: absolute; bottom: 13px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 16, 34, 0.88);
+    border: 1px solid rgba(56, 189, 248, 0.38);
+    padding: 6px 13px; border-radius: 999px;
+    font-size: 11px; color: #E2E8F0;
+    pointer-events: none; z-index: 11;
+    white-space: nowrap;
+    transition: opacity 0.4s ease;
+  }
+
+  /* Overlays */
+  .overlay {
+    position: absolute; inset: 0;
+    background: rgba(5, 8, 18, 0.85);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 25; padding: 12px;
+  }
+  .overlay.show { display: flex; }
+  .panel {
+    width: 100%; max-width: 470px; max-height: 92vh; overflow-y: auto;
+    background: #0C1428;
+    border: 1px solid rgba(56, 189, 248, 0.42);
+    border-radius: 16px;
+    padding: 18px 16px;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72);
+  }
+  .panel h2 {
+    font-size: 22px; font-weight: 900; letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #38BDF8, #F472B6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .panel p.sub { font-size: 12px; color: #94A3B8; margin-bottom: 12px; }
+  .stat-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
+    margin-bottom: 12px;
+  }
+  .stat-box {
+    background: rgba(30, 41, 59, 0.84);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 11px; padding: 7px 5px;
+  }
+  .stat-box .lbl { font-size: 9px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-box .val { font-size: 15px; font-weight: 800; margin-top: 2px; color: #F8FAFC; }
+  .stat-box .val.violet { color: #C084FC; }
+  .stat-box .val.amber { color: #FBBF24; }
+
+  .btn-stack { display: flex; flex-direction: column; gap: 8px; }
+  .btn-primary, .btn-secondary, .btn-reward {
+    width: 100%; padding: 10px 13px; border-radius: 11px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease;
+  }
+  .btn-primary:active, .btn-secondary:active, .btn-reward:active { transform: scale(0.98); }
+  .btn-primary {
+    background: linear-gradient(135deg, #0284C7, #38BDF8);
+    border: 1px solid rgba(125, 211, 252, 0.55); color: #041322;
+  }
+  .btn-secondary {
+    background: rgba(30, 41, 59, 0.92);
+    border: 1px solid rgba(192, 132, 252, 0.5); color: #E9D5FF;
+  }
+  .btn-secondary:hover { background: rgba(88, 28, 135, 0.35); }
+  .btn-reward {
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.58); color: #FDE68A;
+  }
+  .btn-reward:hover { background: rgba(251, 191, 36, 0.25); }
+  .btn-disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .upgrade-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 9px; }
+  .upg-card {
+    display: flex; align-items: center; gap: 11px; text-align: left; width: 100%;
+    background: rgba(30, 41, 59, 0.92);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 11px; padding: 10px 12px; cursor: pointer; color: #F8FAFC;
+    transition: transform 0.12s ease, border-color 0.15s ease;
+  }
+  .upg-card:hover { transform: translateY(-2px); border-color: #38BDF8; }
+  .upg-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 800; flex-shrink: 0; color: #fff;
+  }
+  .upg-title { font-size: 13px; font-weight: 700; color: #F8FAFC; }
+  .upg-desc { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+
+  /* Sector Map & Achievements */
+  .sector-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 10px; }
+  .sector-card {
+    background: rgba(30, 41, 59, 0.88);
+    border: 1px solid rgba(56, 189, 248, 0.32);
+    border-radius: 11px; padding: 8px 9px; text-align: left;
+    cursor: pointer; color: #F8FAFC;
+    transition: transform 0.12s ease, border-color 0.15s ease;
+  }
+  .sector-card:hover:not(:disabled) { transform: translateY(-2px); border-color: #38BDF8; }
+  .sector-card.active { border-color: #38BDF8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.35); }
+  .sector-card:disabled { opacity: 0.42; cursor: not-allowed; }
+  .sector-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 800; }
+  .sector-name { font-size: 10px; color: #94A3B8; margin-top: 2px; }
+  .sector-stars { color: #FBBF24; font-size: 11px; letter-spacing: 1px; }
+
+  .ach-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: rgba(30, 41, 59, 0.86);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 11px; padding: 9px 11px; margin-bottom: 7px; text-align: left;
+  }
+  .ach-row.done { border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.08); }
+  .ach-badge { font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 8px; white-space: nowrap; }
+  .ach-badge.done { background: #F59E0B; color: #0F172A; }
+  .ach-badge.todo { background: rgba(148, 163, 184, 0.2); color: #CBD5E1; }
+
+  /* Crystal Hangar Shop */
+  .shop-section-title {
+    text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #94A3B8; margin: 10px 0 6px;
+  }
+  .shop-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 9px;
+    background: rgba(30, 41, 59, 0.86);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 11px; padding: 8px 10px; margin-bottom: 6px; text-align: left;
+  }
+  .shop-info .t { font-size: 12px; font-weight: 700; color: #F8FAFC; }
+  .shop-info .d { font-size: 11px; color: #94A3B8; margin-top: 1px; }
+  .shop-buy {
+    background: linear-gradient(135deg, #7C3AED, #A855F7);
+    border: none; color: #fff; font-weight: 700; font-size: 11px;
+    padding: 7px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  }
+  .shop-buy.owned { background: rgba(16, 185, 129, 0.22); border: 1px solid #34D399; color: #6EE7B7; }
+  .shop-buy.equipped { background: #10B981; color: #052E16; }
+  .shop-buy:disabled { opacity: 0.4; cursor: not-allowed; }
+  .skin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 10px; }
+  .skin-card {
+    background: rgba(30, 41, 59, 0.86);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 11px; padding: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .skin-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; }
+  .skin-name { font-size: 11px; font-weight: 700; }
+
+  @media (max-width: 780px) {
+    #hud { padding: 5px 7px; }
+    .pill { min-width: 40px; padding: 2px 6px; }
+    .pill-val { font-size: 12px; }
+    .hud-btn { padding: 5px 6px; font-size: 10px; }
+    #sector-banner { top: 42px; font-size: 9px; }
+  }
+  @media (max-width: 560px) {
+    .pill-best-hide { display: none; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="hud-group">
+      <div class="pill"><span class="pill-lbl" id="lbl-wave">Sec 1</span><span class="pill-val cyan" id="hud-wave">1/5</span></div>
+      <div class="pill"><span class="pill-lbl">Score</span><span class="pill-val" id="hud-score">0</span></div>
+      <div class="pill pill-best-hide"><span class="pill-lbl">Best</span><span class="pill-val amber" id="hud-best">0</span></div>
+      <div class="pill"><span class="pill-lbl">Orbs</span><span class="pill-val" id="hud-orbs">3</span></div>
+      <div class="pill"><span class="pill-lbl">◆</span><span class="pill-val violet" id="hud-crystals">0</span></div>
+    </div>
+    <div class="hud-group">
+      <button class="hud-btn map-btn" id="btn-sectors" title="Sectors, Daily & Endless">★ Modes</button>
+      <button class="hud-btn shop-btn" id="btn-shop" title="Permanent Upgrades">◆ Shop</button>
+      <button class="hud-btn ach-btn" id="btn-ach" title="Achievements">🏆</button>
+      <button class="hud-btn" id="btn-bgm" title="Toggle Music (B)">♫</button>
+      <button class="hud-btn" id="btn-mute" title="Toggle Sound (M)">🔊</button>
+      <button class="hud-btn" id="btn-restart" title="Restart">↻</button>
+    </div>
+  </div>
+
+  <div id="sector-banner">SECTOR 1 · CYBER NEBULA</div>
+  <div id="combo-badge">10x COMBO</div>
+  <div id="toast">🏆 Achievement Unlocked!</div>
+
+  <div id="shoot-controls">
+    <button class="action-btn" id="speed-btn">2x Speed</button>
+    <button class="action-btn" id="recall-btn">Fast Recall</button>
+  </div>
+
+  <div id="hint" style="font-weight:800;letter-spacing:0.06em;">🎯 DRAG &amp; RELEASE</div>
+
+  <!-- Wave Upgrade Overlay -->
+  <div class="overlay" id="upg-overlay">
+    <div class="panel">
+      <h2>POWER SURGE</h2>
+      <p class="sub">Pick a plasma upgrade for this run (keys 1-3)</p>
+      <div class="upgrade-grid" id="upg-list"></div>
+    </div>
+  </div>
+
+  <!-- Sector / Daily Clear Overlay -->
+  <div class="overlay" id="clear-overlay">
+    <div class="panel">
+      <h2 id="clear-title">SECTOR CLEARED!</h2>
+      <p class="sub" id="clear-sub">Boss Core neutralized</p>
+      <div id="clear-stars" style="font-size:26px;color:#FBBF24;margin-bottom:10px;letter-spacing:4px;">★★★</div>
+      <div class="stat-row">
+        <div class="stat-box"><div class="lbl">Score</div><div class="val" id="clear-score">0</div></div>
+        <div class="stat-box"><div class="lbl">Reward</div><div class="val violet" id="clear-reward">+25 ◆</div></div>
+        <div class="stat-box"><div class="lbl">Best</div><div class="val amber" id="clear-best">0</div></div>
+        <div class="stat-box"><div class="lbl">Orbs</div><div class="val" id="clear-orbs">3</div></div>
+      </div>
+      <div class="btn-stack">
+        <button class="btn-primary" id="btn-next-sector">Launch Next Sector →</button>
+        <button class="btn-secondary" id="btn-clear-shop">◆ Upgrade in Plasma Hangar</button>
+        <button class="btn-secondary" id="btn-clear-sectors">★ Modes &amp; Star Map</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modes & Star Map Overlay -->
+  <div class="overlay" id="sector-overlay">
+    <div class="panel">
+      <h2>STAR MAP &amp; MODES</h2>
+      <p class="sub">Conquer 10 Sectors, beat today's seeded Daily Challenge, or go Endless</p>
+      <div class="sector-grid" id="sector-list"></div>
+      <div class="btn-stack">
+        <button class="btn-reward" id="btn-daily">📅 Daily Challenge (5 Waves · +40 ◆ Bonus)</button>
+        <button class="btn-primary" id="btn-endless">∞ Play Endless Arcade Mode</button>
+        <button class="btn-secondary" id="btn-sector-close">Back to Current Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievements Overlay -->
+  <div class="overlay" id="ach-overlay">
+    <div class="panel">
+      <h2>ACHIEVEMENTS</h2>
+      <p class="sub">Complete milestones to earn permanent Crystal bonuses</p>
+      <div id="ach-list"></div>
+      <button class="btn-primary" id="btn-ach-close">Back to Game</button>
+    </div>
+  </div>
+
+  <!-- Crystal Hangar (Persistent Meta-Upgrades) -->
+  <div class="overlay" id="shop-overlay">
+    <div class="panel">
+      <h2>PLASMA HANGAR</h2>
+      <p class="sub">Permanent upgrades saved across sessions · Balance: <strong id="shop-balance" style="color:#C084FC">0 ◆</strong></p>
+      <div class="shop-section-title">Permanent Core Upgrades</div>
+      <div id="shop-upgrades"></div>
+      <div class="shop-section-title">Orb Skins</div>
+      <div class="skin-grid" id="shop-skins"></div>
+      <button class="btn-primary" id="btn-shop-close">Back to Game</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay" id="over-overlay">
+    <div class="panel">
+      <h2>BREACH DETECTED</h2>
+      <p class="sub" id="over-sub">Blocks reached the launch line</p>
+      <div class="stat-row">
+        <div class="stat-box"><div class="lbl">Wave</div><div class="val" id="over-wave">1</div></div>
+        <div class="stat-box"><div class="lbl">Score</div><div class="val" id="over-score">0</div></div>
+        <div class="stat-box"><div class="lbl">Best</div><div class="val amber" id="over-best">0</div></div>
+        <div class="stat-box"><div class="lbl">Crystals</div><div class="val violet" id="over-crystals">+0</div></div>
+      </div>
+      <div class="btn-stack">
+        <button class="btn-reward" id="btn-revive-ad">▶ Watch Ad: Clear Bottom 2 Rows &amp; Continue</button>
+        <button class="btn-secondary" id="btn-revive-crystal">◆ Spend 15 Crystals: Clear Bottom 2 Rows &amp; Continue</button>
+        <button class="btn-secondary" id="btn-over-shop">◆ Open Plasma Hangar</button>
+        <button class="btn-primary" id="btn-play-again">Play Again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const SAVE_KEY = 'orbit_breaker_save_v6';
+  const PREV_KEYS = ['orbit_breaker_save_v5', 'orbit_breaker_save_v4', 'orbit_breaker_save_v3'];
+  const LEGACY_BEST_KEY = 'orbit_breaker_best_v1';
+
+  // --- Deterministic PRNG (for Daily Challenge mode) ---
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function todayUtcKey() {
+    const d = new Date();
+    return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+  }
+  let activeRng = Math.random;
+
+  // --- 10 Campaign Sectors ---
+  const SECTORS = [
+    { id: 1,  name: 'Cyber Nebula',      waves: 5,  hpScale: 1.0,  bgA: '#132247', bgB: '#050812', accent: '#38BDF8', reward: 20,  pattern: 'standard' },
+    { id: 2,  name: 'Solar Forge',       waves: 6,  hpScale: 1.25, bgA: '#3B1A12', bgB: '#0A060B', accent: '#F59E0B', reward: 25,  pattern: 'diamond' },
+    { id: 3,  name: 'Prism Trench',      waves: 6,  hpScale: 1.45, bgA: '#1C1442', bgB: '#060714', accent: '#A855F7', reward: 30,  pattern: 'columns' },
+    { id: 4,  name: 'Emerald Core',      waves: 7,  hpScale: 1.7,  bgA: '#0D2E2A', bgB: '#040C0F', accent: '#10B981', reward: 35,  pattern: 'checker' },
+    { id: 5,  name: 'Crimson Rift',      waves: 7,  hpScale: 2.0,  bgA: '#3A0F27', bgB: '#090510', accent: '#F43F5E', reward: 45,  pattern: 'fortress' },
+    { id: 6,  name: 'Ion Storm',         waves: 8,  hpScale: 2.35, bgA: '#0F2A44', bgB: '#050914', accent: '#06B6D4', reward: 50,  pattern: 'laser_heavy' },
+    { id: 7,  name: 'Obsidian Ring',     waves: 8,  hpScale: 2.75, bgA: '#1F1B33', bgB: '#05060D', accent: '#818CF8', reward: 60,  pattern: 'shield_wall' },
+    { id: 8,  name: 'Nova Foundry',      waves: 9,  hpScale: 3.2,  bgA: '#3B1626', bgB: '#09050F', accent: '#FB7185', reward: 70,  pattern: 'splitter_chaos' },
+    { id: 9,  name: 'Astral Spire',      waves: 9,  hpScale: 3.7,  bgA: '#122E38', bgB: '#040911', accent: '#2DD4BF', reward: 85,  pattern: 'diamond' },
+    { id: 10, name: 'Omega Singularity', waves: 10, hpScale: 4.3,  bgA: '#2D1047', bgB: '#05040D', accent: '#E879F9', reward: 120, pattern: 'fortress' }
+  ];
+
+  // --- Achievements ---
+  const ACHIEVEMENTS = [
+    { id: 'sec1',   title: 'Sector Pioneer',   desc: 'Clear Sector 1 (Cyber Nebula)',           reward: 15 },
+    { id: 'combo25',title: 'Combo Architect',  desc: 'Reach a 25x Combo in a single volley',    reward: 20 },
+    { id: 'boss3',  title: 'Boss Hunter',      desc: 'Defeat 3 Boss Cores across any runs',     reward: 25 },
+    { id: 'orbs15', title: 'Plasma Swarm',     desc: 'Hold 15 or more Orbs in a single run',    reward: 20 },
+    { id: 'daily1', title: 'Daily Challenger', desc: 'Complete a seeded Daily Challenge',       reward: 30 }
+  ];
+
+  const SKINS = [
+    { id: 'cyan',    name: 'Cyan Plasma',  cost: 0,   core: '#E0F2FE', stroke: '#38BDF8', trail: '56, 189, 248' },
+    { id: 'gold',    name: 'Solar Gold',   cost: 40,  core: '#FEF3C7', stroke: '#F59E0B', trail: '245, 158, 11' },
+    { id: 'magenta', name: 'Hyper Nova',   cost: 80,  core: '#FCE7F3', stroke: '#EC4899', trail: '236, 72, 153' },
+    { id: 'emerald', name: 'Emerald Flux', cost: 120, core: '#D1FAE5', stroke: '#10B981', trail: '16, 185, 129' }
+  ];
+
+  const META_UPGRADES = [
+    { key: 'lvlOrbs',     name: 'Starting Orbs',       max: 5, baseCost: 20, stepCost: 20, desc: (l) => `Start each run with ${3 + l} orbs (+1/lvl)` },
+    { key: 'lvlDmg',      name: 'Plasma Core Damage',  max: 4, baseCost: 35, stepCost: 35, desc: (l) => `Base orb damage: ${1 + l} (+1/lvl)` },
+    { key: 'lvlCrystals', name: 'Crystal Harvester',   max: 4, baseCost: 25, stepCost: 25, desc: (l) => `Crystal bonus: +${l * 25}% (+25%/lvl)` }
+  ];
+
+  // --- Persistent Meta Progression ---
+  const defaultMeta = () => ({
+    best: 0,
+    crystals: 15,
+    unlockedSector: 1,
+    sectorStars: {},
+    bossKills: 0,
+    achievements: [],
+    dailyDoneDate: '',
+    dailyBest: 0,
+    lvlOrbs: 0,
+    lvlDmg: 0,
+    lvlCrystals: 0,
+    ownedSkins: ['cyan'],
+    skin: 'cyan',
+    bgmOn: true
+  });
+
+  let meta = defaultMeta();
+
+  function loadLocalMeta() {
+    try {
+      let raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        for (const k of PREV_KEYS) {
+          raw = localStorage.getItem(k);
+          if (raw) break;
+        }
+      }
+      if (raw) {
+        meta = Object.assign(defaultMeta(), JSON.parse(raw));
+      } else {
+        const legacy = parseInt(localStorage.getItem(LEGACY_BEST_KEY) || '0', 10) || 0;
+        meta.best = Math.max(meta.best, legacy);
+      }
+    } catch (e) {}
+  }
+
+  function saveMeta() {
+    const payload = JSON.stringify(meta);
+    try { localStorage.setItem(SAVE_KEY, payload); } catch (e) {}
+    CG.saveCloudData(SAVE_KEY, payload);
+  }
+
+  function currentSkin() {
+    return SKINS.find(s => s.id === meta.skin) || SKINS[0];
+  }
+
+  // --- Toast Helper ---
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2800);
+  }
+
+  function unlockAchievement(id) {
+    if (meta.achievements.includes(id)) return;
+    const ach = ACHIEVEMENTS.find(a => a.id === id);
+    if (!ach) return;
+    meta.achievements.push(id);
+    meta.crystals += ach.reward;
+    saveMeta();
+    syncHUD();
+    AudioSys.playPickup();
+    showToast(`🏆 ${ach.title} (+${ach.reward} ◆)`);
+  }
+
+// ============================================================================
+// Unified 6-Store SDK Bridge — Strict Per-Store Isolation (Independent Ad Networks)
+// Targets: 'crazygames' | 'gamepix' | 'playgama' | 'telegram' | 'android' | 'itch'
+// ============================================================================
+const StoreBridge = (() => {
+  const PLATFORM = 'telegram';
+  const SAVE_KEY = 'orbit_breaker_save_v6';
+  const MONETAG_FN = window.ORBIT_MONETAG_FN || '';   // e.g. 'show_8900000'
+  const ADSGRAM_BLOCK = window.ORBIT_ADSGRAM_ID || ''; // e.g. 'int-4000'
+
+  let ready = false;
+  let adPlaying = false;
+  let gameplayActive = false;
+  let pendingGameplayStart = false;
+  let hasAdblock = false;
+  let rewardedUnavailable = false;
+  let lastMidgameMs = performance.now();
+  let cgSdk = null;
+  let pgBridge = null;
+  let tgWebApp = null;
+  let adsgramCtrl = null;
+  let onMuteCb = null;
+  let onCloudDataCb = null;
+
+  function setMute(flag) {
+    if (typeof onMuteCb === 'function') onMuteCb(!!flag);
+  }
+
+  function haptic(kind) {
+    try {
+      if (PLATFORM === 'telegram' && tgWebApp && tgWebApp.HapticFeedback) {
+        if (kind === 'heavy' || kind === 'medium' || kind === 'light') {
+          tgWebApp.HapticFeedback.impactOccurred(kind);
+        } else if (kind === 'success') {
+          tgWebApp.HapticFeedback.notificationOccurred('success');
+        }
+      } else if (PLATFORM === 'android' && navigator.vibrate) {
+        navigator.vibrate(kind === 'heavy' ? 35 : 14);
+      }
+    } catch (e) {}
+  }
+
+  async function init(opts = {}) {
+    onMuteCb = opts.onMute || null;
+    onCloudDataCb = opts.onCloudData || null;
+
+    if (PLATFORM === 'crazygames') {
+      try {
+        let attempts = 0;
+        while (!(window.CrazyGames && window.CrazyGames.SDK) && attempts < 40) {
+          await new Promise(r => setTimeout(r, 50));
+          attempts++;
+        }
+        if (window.CrazyGames && window.CrazyGames.SDK) {
+          await window.CrazyGames.SDK.init();
+          cgSdk = window.CrazyGames.SDK;
+          ready = true;
+          if (cgSdk.game && cgSdk.game.loadingStart) cgSdk.game.loadingStart();
+          if (cgSdk.game && cgSdk.game.settings && cgSdk.game.settings.muteAudio) setMute(true);
+          if (cgSdk.game && cgSdk.game.addSettingsChangeListener) {
+            cgSdk.game.addSettingsChangeListener(s => {
+              if (typeof s.muteAudio === 'boolean') setMute(s.muteAudio);
+            });
+          }
+          if (cgSdk.data && cgSdk.data.getItem && onCloudDataCb) {
+            try {
+              const raw = cgSdk.data.getItem(SAVE_KEY) || cgSdk.data.getItem('orbit_breaker_save_v5');
+              if (raw) onCloudDataCb(raw);
+            } catch (e) {}
+          }
+          if (cgSdk.ad && cgSdk.ad.hasAdblock) {
+            try { hasAdblock = await cgSdk.ad.hasAdblock(); } catch (e) {}
+          }
+          if (cgSdk.game && cgSdk.game.loadingStop) cgSdk.game.loadingStop();
+          if (pendingGameplayStart && !gameplayActive) {
+            pendingGameplayStart = false;
+            gameplayStart();
+          }
+        }
+      } catch (e) {}
+      return;
+    }
+
+    if (PLATFORM === 'playgama') {
+      try {
+        let tries = 0;
+        while (!window.bridge && tries < 40) {
+          await new Promise(r => setTimeout(r, 60));
+          tries++;
+        }
+        if (window.bridge) {
+          pgBridge = window.bridge;
+          await pgBridge.initialize();
+          ready = true;
+          if (pgBridge.platform) {
+            if (pgBridge.platform.isAudioEnabled === false) setMute(true);
+            if (pgBridge.platform.on) {
+              pgBridge.platform.on('audio_state_changed', en => setMute(!en));
+              pgBridge.platform.on('pause_state_changed', paused => setMute(paused));
+            }
+            if (pgBridge.platform.sendMessage) pgBridge.platform.sendMessage('game_ready');
+          }
+          if (pgBridge.storage && onCloudDataCb) {
+            try {
+              const res = await pgBridge.storage.get(SAVE_KEY);
+              const raw = typeof res === 'string' ? res : (Array.isArray(res) ? res[0] : null);
+              if (raw) onCloudDataCb(raw);
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      return;
+    }
+
+    if (PLATFORM === 'gamepix') {
+      ready = typeof window.GamePix !== 'undefined';
+      if (ready && window.GamePix.localStorage && onCloudDataCb) {
+        try {
+          const raw = window.GamePix.localStorage.getItem(SAVE_KEY);
+          if (raw) onCloudDataCb(raw);
+        } catch (e) {}
+      }
+      return;
+    }
+
+    if (PLATFORM === 'telegram') {
+      try {
+        if (window.Telegram && window.Telegram.WebApp) {
+          tgWebApp = window.Telegram.WebApp;
+          tgWebApp.ready();
+          if (tgWebApp.expand) tgWebApp.expand();
+          if (tgWebApp.disableVerticalSwipes) tgWebApp.disableVerticalSwipes();
+          if (tgWebApp.CloudStorage && onCloudDataCb) {
+            tgWebApp.CloudStorage.getItem(SAVE_KEY, (err, val) => {
+              if (!err && val) onCloudDataCb(val);
+            });
+          }
+        }
+        if (window.Adsgram && ADSGRAM_BLOCK) {
+          adsgramCtrl = window.Adsgram.init({ blockId: ADSGRAM_BLOCK });
+        }
+      } catch (e) {}
+      ready = true;
+      return;
+    }
+
+    ready = true;
+  }
+
+  function saveCloudData(key, val) {
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.data && cgSdk.data.setItem) {
+        cgSdk.data.setItem(key, val);
+      } else if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.storage) {
+        pgBridge.storage.set(key, val).catch(() => {});
+      } else if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.localStorage) {
+        window.GamePix.localStorage.setItem(key, val);
+      } else if (PLATFORM === 'telegram' && tgWebApp && tgWebApp.CloudStorage) {
+        tgWebApp.CloudStorage.setItem(key, val, () => {});
+      } else if (PLATFORM === 'android' && window.AndroidAdsBridge && window.AndroidAdsBridge.saveData) {
+        window.AndroidAdsBridge.saveData(key, val);
+      }
+    } catch (e) {}
+  }
+
+  function reportProgress(score, level) {
+    try {
+      if (PLATFORM === 'gamepix' && window.GamePix) {
+        if (window.GamePix.updateScore) window.GamePix.updateScore(Math.floor(score || 0));
+        if (window.GamePix.updateLevel) window.GamePix.updateLevel(Math.floor(level || 1));
+      }
+    } catch (e) {}
+  }
+
+  function gameplayStart() {
+    if (PLATFORM === 'crazygames' && !ready) { pendingGameplayStart = true; return; }
+    if (gameplayActive || adPlaying) return;
+    gameplayActive = true;
+    try {
+      if (PLATFORM === 'crazygames' && cgSdk && cgSdk.game && cgSdk.game.gameplayStart) {
+        cgSdk.game.gameplayStart();
+      } else if (PLATFORM === 'playgama' && pgBridge && pgBridge.platform && pgBridge.platform.sendMessage) {
+        pgBridge.platform.sendMessage('gameplay_started');
+      }
+    } catch (e) {}
+  }
+
+  function gameplayStop() {
+    pendingGameplayStart = false;
+    if (!gameplayActive) return;
+    gameplayActive = false;
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.game && cgSdk.game.gameplayStop) {
+        cgSdk.game.gameplayStop();
+      } else if (PLATFORM === 'playgama' && pgBridge && pgBridge.platform && pgBridge.platform.sendMessage) {
+        pgBridge.platform.sendMessage('gameplay_stopped');
+      }
+    } catch (e) {}
+  }
+
+  function happytime() {
+    haptic('success');
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.game && cgSdk.game.happytime) {
+        cgSdk.game.happytime();
+      } else if (PLATFORM === 'gamepix' && window.GamePix && window.GamePix.happyMoment) {
+        window.GamePix.happyMoment();
+      } else if (PLATFORM === 'playgama' && pgBridge && pgBridge.platform && pgBridge.platform.sendMessage) {
+        pgBridge.platform.sendMessage('player_got_achievement');
+      }
+    } catch (e) {}
+  }
+
+  function requestAd(type, onDone) {
+    if (adPlaying) return;
+    const isMidgame = type === 'midgame';
+    if (isMidgame && performance.now() - lastMidgameMs < 70000) {
+      if (onDone) onDone(true);
+      return;
+    }
+
+    adPlaying = true;
+    setMute(true);
+    let settled = false;
+    const finish = (granted, errored = false) => {
+      if (settled) return;
+      settled = true;
+      adPlaying = false;
+      if (isMidgame) lastMidgameMs = performance.now();
+      if (!isMidgame && errored) rewardedUnavailable = true;
+      setMute(false);
+      if (onDone) onDone(!!granted, !!errored);
+    };
+
+    const safety = setTimeout(() => finish(isMidgame, !isMidgame), 5500);
+
+    try {
+      if (PLATFORM === 'crazygames' && ready && cgSdk && cgSdk.ad && cgSdk.ad.requestAd) {
+        cgSdk.ad.requestAd(type, {
+          adStarted: () => { clearTimeout(safety); setMute(true); },
+          adFinished: () => { clearTimeout(safety); finish(true, false); },
+          adError: () => { clearTimeout(safety); finish(isMidgame, !isMidgame); }
+        });
+        return;
+      }
+
+      if (PLATFORM === 'gamepix' && window.GamePix) {
+        clearTimeout(safety);
+        if (isMidgame && window.GamePix.interstitialAd) {
+          window.GamePix.interstitialAd().then(() => finish(true, false)).catch(() => finish(true, false));
+          return;
+        }
+        if (!isMidgame && window.GamePix.rewardAd) {
+          window.GamePix.rewardAd()
+            .then(res => finish(!!(res && res.success), !(res && res.success)))
+            .catch(() => finish(false, true));
+          return;
+        }
+      }
+
+      if (PLATFORM === 'playgama' && ready && pgBridge && pgBridge.advertisement) {
+        if (isMidgame && pgBridge.advertisement.isInterstitialSupported) {
+          const h = st => {
+            if (st === 'opened') clearTimeout(safety);
+            if (st === 'closed' || st === 'failed') {
+              if (pgBridge.advertisement.off) pgBridge.advertisement.off('interstitial_state_changed', h);
+              finish(true, false);
+            }
+          };
+          if (pgBridge.advertisement.on) pgBridge.advertisement.on('interstitial_state_changed', h);
+          pgBridge.advertisement.showInterstitial();
+          return;
+        }
+        if (!isMidgame && pgBridge.advertisement.isRewardedSupported) {
+          let got = false;
+          const h = st => {
+            if (st === 'opened') clearTimeout(safety);
+            if (st === 'rewarded') got = true;
+            if (st === 'closed' || st === 'failed') {
+              if (pgBridge.advertisement.off) pgBridge.advertisement.off('rewarded_state_changed', h);
+              finish(got, !got);
+            }
+          };
+          if (pgBridge.advertisement.on) pgBridge.advertisement.on('rewarded_state_changed', h);
+          pgBridge.advertisement.showRewarded();
+          return;
+        }
+      }
+
+      if (PLATFORM === 'telegram') {
+        clearTimeout(safety);
+        // Monetag In-App / Rewarded Popup or AdsGram native Mini App SDK
+        if (MONETAG_FN && typeof window[MONETAG_FN] === 'function') {
+          window[MONETAG_FN]().then(() => finish(true, false)).catch(() => finish(isMidgame, !isMidgame));
+          return;
+        }
+        if (adsgramCtrl && adsgramCtrl.show) {
+          adsgramCtrl.show().then(() => finish(true, false)).catch(() => finish(isMidgame, !isMidgame));
+          return;
+        }
+        finish(isMidgame, !isMidgame);
+        return;
+      }
+
+      if (PLATFORM === 'android' && window.AndroidAdsBridge) {
+        clearTimeout(safety);
+        window.__onNativeAdClosed = (ok) => finish(!!ok || isMidgame, !ok && !isMidgame);
+        if (isMidgame && window.AndroidAdsBridge.showInterstitial) {
+          window.AndroidAdsBridge.showInterstitial();
+          return;
+        }
+        if (!isMidgame && window.AndroidAdsBridge.showRewarded) {
+          window.AndroidAdsBridge.showRewarded();
+          return;
+        }
+      }
+    } catch (e) {}
+
+    clearTimeout(safety);
+    finish(isMidgame, !isMidgame);
+  }
+
+  return {
+    PLATFORM,
+    get adPlaying() { return adPlaying; },
+    get hasAdblock() { return hasAdblock; },
+    get rewardedUnavailable() { return rewardedUnavailable; },
+    init,
+    saveCloudData,
+    reportProgress,
+    gameplayStart,
+    gameplayStop,
+    happytime,
+    haptic,
+    requestAd
+  };
+})();
+
+
+  const CG = StoreBridge;
+
+  // --- Genuine ZzFX Micro-Synth + ZzFXM-Style 3-Channel Procedural Space Tracker ---
+  // Zero external MP3/OGG files, zero copyright risk, instant mute on adStarted / tab blur
+  const AudioSys = {
+    ctx: null,
+    sfxMuted: false,
+    bgmOn: true,
+    tempMute: false,
+    tabHidden: false,
+    bgmTimer: null,
+    bgmStep: 0,
+    sampleRate: 44100,
+    scaleHz: [261.63, 293.66, 311.13, 349.23, 392.00, 466.16, 523.25, 587.33, 622.25, 783.99, 1046.50],
+    // 16-step synthwave progression (Cm -> Ab -> Eb -> Bb)
+    bassSeq: [65.41, 65.41, 130.81, 65.41, 51.91, 51.91, 103.83, 51.91, 77.78, 77.78, 155.56, 77.78, 58.27, 58.27, 116.54, 73.42],
+    arpSeq:  [261.63, 311.13, 392.00, 523.25, 311.13, 392.00, 523.25, 622.25, 311.13, 392.00, 466.16, 622.25, 293.66, 349.23, 466.16, 587.33],
+    padSeq:  [130.81, 103.83, 155.56, 116.54],
+
+    unlock() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          this.ctx = new AC();
+          this.sampleRate = this.ctx.sampleRate || 44100;
+        }
+      }
+      if (this.ctx && this.ctx.state === 'suspended' && !this.tempMute && !this.tabHidden) {
+        this.ctx.resume().catch(() => {});
+      }
+      if (this.bgmOn && !this.bgmTimer) this.startBgmLoop();
+    },
+
+    // Compact ZzFX procedural buffer generator (Frank Force style synthesis)
+    zzfx(vol = 1, freq = 220, attack = 0.004, sustain = 0.04, release = 0.08, shape = 0, slide = 0, noise = 0) {
+      if (this.sfxMuted || this.tempMute || this.tabHidden || !this.ctx || this.ctx.state !== 'running') return;
+      try {
+        const sr = this.sampleRate;
+        const aLen = Math.max(1, Math.floor(attack * sr));
+        const sLen = Math.max(1, Math.floor(sustain * sr));
+        const rLen = Math.max(1, Math.floor(release * sr));
+        const total = aLen + sLen + rLen;
+        const buf = this.ctx.createBuffer(1, total, sr);
+        const ch = buf.getChannelData(0);
+        let phase = 0;
+        let f = freq;
+        const dSlide = slide / sr;
+        for (let i = 0; i < total; i++) {
+          let env = 1;
+          if (i < aLen) env = i / aLen;
+          else if (i >= aLen + sLen) env = 1 - (i - aLen - sLen) / rLen;
+          f = Math.max(24, f + dSlide);
+          phase += (f * Math.PI * 2) / sr;
+          let s = shape === 0 ? Math.sin(phase)
+                : shape === 1 ? (Math.sin(phase) > 0 ? 0.7 : -0.7)
+                : shape === 2 ? (((phase / (Math.PI * 2)) % 1) * 2 - 1)
+                : (2 / Math.PI) * Math.asin(Math.sin(phase));
+          if (noise > 0) s = s * (1 - noise) + (Math.random() * 2 - 1) * noise;
+          ch[i] = s * env * env * vol;
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(this.ctx.destination);
+        src.start();
+      } catch (e) {}
+    },
+
+    setMasterMute(muted) {
+      this.sfxMuted = muted;
+      if (muted) this.bgmOn = false;
+      const bm = document.getElementById('btn-mute');
+      const bb = document.getElementById('btn-bgm');
+      if (bm) bm.textContent = this.sfxMuted ? '🔇' : '🔊';
+      if (bb) bb.textContent = this.bgmOn ? '♫' : '♫✕';
+    },
+
+    setTempMute(flag) {
+      this.tempMute = flag;
+      if (this.ctx) {
+        if (flag || this.tabHidden) this.ctx.suspend().catch(() => {});
+        else if (!this.sfxMuted || this.bgmOn) this.ctx.resume().catch(() => {});
+      }
+    },
+
+    setTabHidden(hidden) {
+      this.tabHidden = hidden;
+      if (this.ctx) {
+        if (hidden || this.tempMute) this.ctx.suspend().catch(() => {});
+        else if (!this.sfxMuted || this.bgmOn) this.ctx.resume().catch(() => {});
+      }
+    },
+
+    startBgmLoop() {
+      if (this.bgmTimer) return;
+      this.bgmTimer = setInterval(() => {
+        if (!this.bgmOn || this.tempMute || this.tabHidden || !this.ctx || this.ctx.state !== 'running') return;
+        if (state.phase === 'over') return;
+        try {
+          const now = this.ctx.currentTime;
+          const step = this.bgmStep++ % 16;
+          const isBoss = state.blocks.some(b => b.type === 'boss');
+          const pitchShift = isBoss ? 1.122 : (1 + ((state.sectorId - 1) % 3) * 0.03);
+
+          // Ch1: Filtered Saw Bass
+          const bOsc = this.ctx.createOscillator();
+          const bFilt = this.ctx.createBiquadFilter();
+          const bGain = this.ctx.createGain();
+          bOsc.type = 'sawtooth';
+          bOsc.frequency.setValueAtTime(this.bassSeq[step] * pitchShift, now);
+          bFilt.type = 'lowpass';
+          bFilt.frequency.setValueAtTime(isBoss ? 410 : 280, now);
+          bGain.gain.setValueAtTime(0.025, now);
+          bGain.gain.exponentialRampToValueAtTime(0.0008, now + 0.19);
+          bOsc.connect(bFilt); bFilt.connect(bGain); bGain.connect(this.ctx.destination);
+          bOsc.start(now); bOsc.stop(now + 0.2);
+
+          // Ch2: Shimmering ZzFXM-style Arp Lead
+          const lOsc = this.ctx.createOscillator();
+          const lGain = this.ctx.createGain();
+          lOsc.type = step % 4 === 0 ? 'triangle' : 'sine';
+          lOsc.frequency.setValueAtTime(this.arpSeq[step] * pitchShift, now);
+          lGain.gain.setValueAtTime(0.015, now);
+          lGain.gain.exponentialRampToValueAtTime(0.0007, now + 0.16);
+          lOsc.connect(lGain); lGain.connect(this.ctx.destination);
+          lOsc.start(now); lOsc.stop(now + 0.17);
+
+          // Ch3: Warm Cosmic Pad every 4 steps
+          if (step % 4 === 0) {
+            const pOsc = this.ctx.createOscillator();
+            const pGain = this.ctx.createGain();
+            pOsc.type = 'sine';
+            pOsc.frequency.setValueAtTime(this.padSeq[Math.floor(step / 4)] * pitchShift * 2, now);
+            pGain.gain.setValueAtTime(0.001, now);
+            pGain.gain.linearRampToValueAtTime(0.014, now + 0.18);
+            pGain.gain.exponentialRampToValueAtTime(0.0008, now + 0.72);
+            pOsc.connect(pGain); pGain.connect(this.ctx.destination);
+            pOsc.start(now); pOsc.stop(now + 0.75);
+          }
+        } catch (e) {}
+      }, 195);
+    },
+
+    playShootTick() {
+      this.zzfx(0.055, 660 + (Math.random() * 60 - 30), 0.002, 0.012, 0.03, 0, -4800, 0.04);
+    },
+
+    playHit(combo) {
+      const f = this.scaleHz[combo % this.scaleHz.length] * (combo >= 14 ? 1.5 : 1);
+      this.zzfx(0.085, f, 0.002, 0.022, 0.065, 3, 900, 0.02);
+      CG.haptic('light');
+    },
+
+    playShieldClink() {
+      this.zzfx(0.075, 1320, 0.001, 0.018, 0.055, 1, -3600, 0.12);
+    },
+
+    playLaser() {
+      this.zzfx(0.11, 1180, 0.003, 0.05, 0.16, 2, -5200, 0.15);
+      CG.haptic('medium');
+    },
+
+    playPickup() {
+      [523.25, 659.25, 783.99].forEach((f, idx) => {
+        setTimeout(() => this.zzfx(0.08, f, 0.003, 0.035, 0.09, 0, 400, 0), idx * 42);
+      });
+    },
+
+    playVictory() {
+      [392.00, 523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+        setTimeout(() => this.zzfx(0.095, f, 0.004, 0.06, 0.18, 3, 250, 0), idx * 68);
+      });
+    },
+
+    playBoom() {
+      this.zzfx(0.16, 165, 0.004, 0.07, 0.24, 2, -480, 0.52);
+      CG.haptic('heavy');
+    }
+  };
+
+  // --- Canvas & Responsive Layout ---
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let W = 800, H = 600, DPR = 1;
+  const COLS = 7, ROWS = 9;
+  const board = { x: 0, y: 0, w: 0, h: 0, cell: 50, pad: 4 };
+  let hasFiredFirstShot = false;
+  let tutorialClock = 0;
+  const nebulae = [
+    { x: 0.28, y: 0.32, r: 0.38, vx: 0.006, vy: 0.004, hue: 0 },
+    { x: 0.74, y: 0.66, r: 0.44, vx: -0.005, vy: -0.003, hue: 1 }
+  ];
+  const stars = Array.from({ length: 92 }, (_, idx) => {
+    const layer = idx % 3; // 0=deep, 1=mid, 2=near parallax
+    return {
+      x: Math.random(), y: Math.random(), layer,
+      r: 0.55 + layer * 0.58 + Math.random() * 0.55,
+      speed: 0.003 + layer * 0.009 + Math.random() * 0.005,
+      a: 0.16 + layer * 0.2 + Math.random() * 0.25,
+      tw: Math.random() * 6.28
+    };
+  });
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    const topMargin = H < 520 ? 64 : 74;
+    const bottomMargin = H < 520 ? 44 : 52;
+    const availW = W - 24;
+    const availH = H - topMargin - bottomMargin;
+    board.cell = Math.floor(Math.min(availW / COLS, availH / (ROWS + 0.65)));
+    board.cell = Math.max(26, Math.min(72, board.cell));
+    board.w = board.cell * COLS;
+    board.h = board.cell * (ROWS + 0.65);
+    board.x = Math.floor((W - board.w) / 2);
+    board.y = Math.floor(topMargin + (availH - board.h) / 2);
+    board.pad = Math.max(2.5, Math.floor(board.cell * 0.075));
+
+    if (state.launcherX === 0 || state.launcherX < board.x || state.launcherX > board.x + board.w) {
+      state.launcherX = board.x + board.w / 2;
+    }
+    state.launcherY = board.y + board.h - 14;
+  }
+
+  // --- Game State ---
+  loadLocalMeta();
+  AudioSys.bgmOn = meta.bgmOn !== false;
+
+  const state = {
+    mode: 'sector', // 'sector' | 'daily' | 'endless'
+    sectorId: Math.min(SECTORS.length, meta.unlockedSector || 1),
+    phase: 'aim',   // 'aim' | 'shoot' | 'upgrade' | 'shop' | 'sectors' | 'ach' | 'clear' | 'over'
+    prevPhase: 'aim',
+    wave: 1,
+    score: 0,
+    runCrystals: 0,
+    blocksCleared: 0,
+    orbCount: 3,
+    orbDamage: 1,
+    overdriveNextTurn: false,
+    overdriveActive: false,
+    critChance: 0.08,
+    bombPower: 2,
+    extraBounceSpeed: 1,
+    revivedOnce: false,
+    celebratedBest: false,
+    fastForward: false,
+    launcherX: 0,
+    launcherY: 0,
+    recoil: 0,
+    nextLauncherX: null,
+    aiming: false,
+    aimAngle: -Math.PI / 2,
+    orbsToFire: 0,
+    fireTimer: 0,
+    fireAngle: -Math.PI / 2,
+    activeOrbs: [],
+    blocks: [],
+    pickups: [],
+    particles: [],
+    rings: [],
+    beams: [],
+    popups: [],
+    combo: 0,
+    shake: 0,
+    hitstop: 0,
+    shootElapsed: 0,
+    trailAcc: 0,
+    activeUpgrades: []
+  };
+
+  function currentSector() {
+    if (state.mode === 'daily') {
+      return { id: 0, name: `Daily ${todayUtcKey()}`, waves: 5, hpScale: 1.35, bgA: '#2E1A47', bgB: '#060714', accent: '#FBBF24', reward: 40, pattern: 'diamond' };
+    }
+    return SECTORS.find(s => s.id === state.sectorId) || SECTORS[0];
+  }
+
+  // --- HUD & Overlay Refs ---
+  const lblWave = document.getElementById('lbl-wave');
+  const hudWave = document.getElementById('hud-wave');
+  const hudScore = document.getElementById('hud-score');
+  const hudBest = document.getElementById('hud-best');
+  const hudOrbs = document.getElementById('hud-orbs');
+  const hudCrystals = document.getElementById('hud-crystals');
+  const sectorBanner = document.getElementById('sector-banner');
+  const comboBadge = document.getElementById('combo-badge');
+  const shootControls = document.getElementById('shoot-controls');
+  const speedBtn = document.getElementById('speed-btn');
+  const recallBtn = document.getElementById('recall-btn');
+  const hintEl = document.getElementById('hint');
+  const upgOverlay = document.getElementById('upg-overlay');
+  const upgList = document.getElementById('upg-list');
+  const clearOverlay = document.getElementById('clear-overlay');
+  const sectorOverlay = document.getElementById('sector-overlay');
+  const sectorList = document.getElementById('sector-list');
+  const achOverlay = document.getElementById('ach-overlay');
+  const achList = document.getElementById('ach-list');
+  const shopOverlay = document.getElementById('shop-overlay');
+  const shopBalance = document.getElementById('shop-balance');
+  const shopUpgrades = document.getElementById('shop-upgrades');
+  const shopSkins = document.getElementById('shop-skins');
+  const overOverlay = document.getElementById('over-overlay');
+  const btnReviveAd = document.getElementById('btn-revive-ad');
+  const btnReviveCrystal = document.getElementById('btn-revive-crystal');
+  const btnBgm = document.getElementById('btn-bgm');
+  btnBgm.textContent = AudioSys.bgmOn ? '♫' : '♫✕';
+
+  function syncHUD() {
+    if (state.mode === 'sector') {
+      const sec = currentSector();
+      lblWave.textContent = `Sec ${sec.id}`;
+      hudWave.textContent = `${Math.min(state.wave, sec.waves)}/${sec.waves}`;
+      sectorBanner.textContent = `SECTOR ${sec.id} · ${sec.name.toUpperCase()}` + (state.overdriveNextTurn ? ' · ⚡2x DMG READY' : '');
+      sectorBanner.style.borderColor = sec.accent;
+    } else if (state.mode === 'daily') {
+      lblWave.textContent = 'Daily';
+      hudWave.textContent = `${Math.min(state.wave, 5)}/5`;
+      sectorBanner.textContent = `DAILY CHALLENGE · ${todayUtcKey()}` + (state.overdriveNextTurn ? ' · ⚡2x DMG READY' : '');
+      sectorBanner.style.borderColor = '#FBBF24';
+    } else {
+      lblWave.textContent = 'Wave';
+      hudWave.textContent = String(state.wave);
+      sectorBanner.textContent = 'ENDLESS ARCADE MODE' + (state.overdriveNextTurn ? ' · ⚡2x DMG READY' : '');
+      sectorBanner.style.borderColor = '#38BDF8';
+    }
+    hudScore.textContent = state.score;
+    hudBest.textContent = meta.best;
+    hudOrbs.textContent = state.orbCount;
+    hudCrystals.textContent = meta.crystals;
+    if (state.orbCount >= 15) unlockAchievement('orbs15');
+  }
+
+  function addCrystals(rawAmt, x, y) {
+    const mult = 1 + meta.lvlCrystals * 0.25;
+    const amt = Math.max(1, Math.round(rawAmt * mult));
+    meta.crystals += amt;
+    state.runCrystals += amt;
+    saveMeta();
+    syncHUD();
+    if (x !== undefined && y !== undefined) addPopup(x, y - 10, `+${amt} ◆`, '#C084FC');
+  }
+
+  function addScore(pts) {
+    state.score += pts;
+    if (state.score > meta.best) {
+      const prevBest = meta.best;
+      meta.best = state.score;
+      saveMeta();
+      if (!state.celebratedBest && prevBest >= 250 && state.score >= 600) {
+        state.celebratedBest = true;
+        CG.happytime();
+        addPopup(board.x + board.w / 2, board.y + 42, 'NEW BEST SCORE!', '#FDE047');
+      }
+    }
+    CG.reportProgress(state.score, state.wave);
+    syncHUD();
+  }
+
+  // --- Patterned Wave Spawning ---
+  function spawnRow(rowIdx) {
+    const rng = activeRng;
+    const w = state.wave;
+    const sec = currentSector();
+    const scale = (state.mode === 'sector' || state.mode === 'daily') ? sec.hpScale : (1 + Math.floor(w / 6) * 0.25);
+    const isFinalWave = ((state.mode === 'sector' || state.mode === 'daily') && w === sec.waves && rowIdx === 0);
+    const isEndlessBoss = (state.mode === 'endless' && w % 5 === 0 && w >= 5 && rowIdx === 0);
+
+    const cols = Array.from({ length: COLS }, (_, i) => i);
+    for (let i = cols.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [cols[i], cols[j]] = [cols[j], cols[i]];
+    }
+
+    if (isFinalWave || isEndlessBoss) {
+      const bossCol = 3;
+      const bossHp = Math.max(8, Math.round(w * 3.8 * scale));
+      state.blocks.push({ col: bossCol, row: rowIdx, hp: bossHp, maxHp: bossHp, type: 'boss', shield: false, hitFlash: 0, usedSplit: false });
+      state.pickups.push({ col: 1, row: rowIdx, kind: 'orb', pulse: 0 });
+      state.pickups.push({ col: 5, row: rowIdx, kind: 'overdrive', pulse: 2 });
+      [2, 4].forEach((c, idx) => {
+        const hp = Math.max(2, Math.round(w * 1.15 * scale));
+        state.blocks.push({ col: c, row: rowIdx, hp, maxHp: hp, type: idx === 0 ? 'bomb' : 'laser', shield: false, hitFlash: 0, usedSplit: false });
+      });
+      addPopup(board.x + board.w / 2, board.y + board.cell * 1.25, state.mode === 'daily' ? 'DAILY BOSS!' : (isFinalWave ? `SECTOR ${sec.id} BOSS!` : `BOSS WAVE ${w}!`), '#F472B6');
+      return;
+    }
+
+    let chosenCols = [];
+    const pat = (state.mode === 'sector' || state.mode === 'daily') ? sec.pattern : 'standard';
+    if (pat === 'diamond') {
+      const odd = (w + rowIdx) % 2 === 0;
+      chosenCols = odd ? [2, 3, 4] : [1, 2, 4, 5];
+    } else if (pat === 'columns') {
+      chosenCols = [0, 2, 4, 6].filter(() => rng() < 0.85);
+      if (chosenCols.length < 2) chosenCols = [1, 3, 5];
+    } else if (pat === 'checker') {
+      chosenCols = ((w + rowIdx) % 2 === 0) ? [0, 2, 4, 6] : [1, 3, 5];
+    } else if (pat === 'fortress') {
+      chosenCols = [0, 1, 3, 5, 6].filter(() => rng() < 0.82);
+      if (chosenCols.length < 3) chosenCols = [1, 3, 5];
+    } else {
+      const minB = Math.min(5, 2 + Math.floor(w / 3));
+      const maxB = Math.min(COLS - 1, 4 + Math.floor(w / 3));
+      const count = minB + Math.floor(rng() * (maxB - minB + 1));
+      chosenCols = cols.slice(0, count);
+    }
+
+    const emptyCols = cols.filter(c => !chosenCols.includes(c));
+    if (emptyCols.length > 0) {
+      const kind = (w >= 3 && rng() < 0.22) ? 'overdrive' : 'orb';
+      state.pickups.push({ col: emptyCols[0], row: rowIdx, kind, pulse: rng() * 6 });
+    }
+
+    chosenCols.forEach(col => {
+      const roll = rng();
+      let type = 'normal';
+      let shield = false;
+      if (pat === 'laser_heavy' && roll < 0.25) type = 'laser';
+      else if (pat === 'splitter_chaos' && roll < 0.25) type = 'splitter';
+      else if (w >= 2 && roll < 0.12) type = 'bomb';
+      else if (w >= 2 && roll < 0.21) type = 'laser';
+      else if (w >= 3 && roll < 0.29) type = 'splitter';
+      else if (w >= 3 && roll < 0.44) type = 'tank';
+
+      if ((pat === 'shield_wall' || w >= 4) && type === 'normal' && rng() < (pat === 'shield_wall' ? 0.35 : 0.14)) {
+        shield = true;
+      }
+
+      let mult = 0.88 + rng() * 0.48;
+      if (type === 'tank') mult *= 1.7;
+      if (type === 'bomb' || type === 'laser') mult *= 0.72;
+      if (type === 'splitter') mult *= 0.85;
+
+      const hp = Math.max(1, Math.round(w * mult * scale * (1 + meta.lvlDmg * 0.22)));
+      state.blocks.push({ col, row: rowIdx, hp, maxHp: hp, type, shield, hitFlash: 0, usedSplit: false });
+    });
+  }
+
+  function resetGame(newMode, newSectorId) {
+    if (newMode) state.mode = newMode;
+    if (newSectorId) state.sectorId = newSectorId;
+    activeRng = (state.mode === 'daily') ? mulberry32(parseInt(todayUtcKey(), 10)) : Math.random;
+
+    state.phase = 'aim';
+    state.wave = 1;
+    state.score = 0;
+    state.runCrystals = 0;
+    state.blocksCleared = 0;
+    state.orbCount = 3 + meta.lvlOrbs;
+    state.orbDamage = 1 + meta.lvlDmg;
+    state.overdriveNextTurn = false;
+    state.overdriveActive = false;
+    state.critChance = 0.08;
+    state.bombPower = 2;
+    state.extraBounceSpeed = 1;
+    state.revivedOnce = false;
+    state.celebratedBest = false;
+    state.fastForward = false;
+    state.blocks = [];
+    state.pickups = [];
+    state.activeOrbs = [];
+    state.particles = [];
+    state.rings = [];
+    state.beams = [];
+    state.popups = [];
+    state.combo = 0;
+    state.shake = 0;
+    state.hitstop = 0;
+    state.recoil = 0;
+    state.nextLauncherX = null;
+    state.launcherX = board.x + board.w / 2;
+    state.launcherY = board.y + board.h - 14;
+    [upgOverlay, shopOverlay, sectorOverlay, achOverlay, clearOverlay, overOverlay].forEach(el => el.classList.remove('show'));
+    shootControls.classList.remove('show');
+    speedBtn.classList.remove('active');
+    speedBtn.textContent = '2x Speed';
+    comboBadge.classList.remove('show');
+    hintEl.style.opacity = '1';
+    spawnRow(1);
+    spawnRow(2);
+    syncHUD();
+    CG.gameplayStart();
+  }
+
+  // --- VFX Helpers ---
+  function emitParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 65 + Math.random() * 235;
+      state.particles.push({
+        x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+        r: 2 + Math.random() * 3.4, color,
+        life: 0.32 + Math.random() * 0.3, maxLife: 0.62
+      });
+    }
+  }
+
+  function addRing(x, y, color, maxR) {
+    state.rings.push({ x, y, r: 8, maxR, color, life: 0.38, maxLife: 0.38 });
+  }
+
+  function addPopup(x, y, text, color) {
+    state.popups.push({ x, y, text, color, life: 0.85, maxLife: 0.85 });
+  }
+
+  // --- Run Upgrades every 3 waves ---
+  const UPGRADES = [
+    { id: 'orbs', icon: '+3', bg: '#0284C7', title: 'Tri-Orb Core', desc: 'Add +3 orbs to every volley this run', apply: () => { state.orbCount += 3; } },
+    { id: 'dmg',  icon: '+1', bg: '#DB2777', title: 'Plasma Overcharge', desc: '+1 damage per orb hit this run', apply: () => { state.orbDamage += 1; } },
+    { id: 'crit', icon: '⚡', bg: '#D97706', title: 'Crit Nova', desc: '+18% chance for 2x critical hits', apply: () => { state.critChance = Math.min(0.75, state.critChance + 0.18); } },
+    { id: 'bomb', icon: '💥', bg: '#7C3AED', title: 'Chain Shockwave', desc: 'Bomb & Laser blocks deal massive area damage', apply: () => { state.bombPower += 2; } },
+    { id: 'spd',  icon: '»',  bg: '#0D9488', title: 'Hyper Velocity', desc: '+15% orb speed for faster combos', apply: () => { state.extraBounceSpeed = Math.min(1.65, state.extraBounceSpeed + 0.15); } }
+  ];
+
+  function selectUpgrade(idx) {
+    const u = state.activeUpgrades[idx];
+    if (!u || state.phase !== 'upgrade') return;
+    AudioSys.playPickup();
+    u.apply();
+    syncHUD();
+    upgOverlay.classList.remove('show');
+    state.phase = 'aim';
+    CG.gameplayStart();
+  }
+
+  function showUpgradeMenu() {
+    state.phase = 'upgrade';
+    CG.gameplayStop();
+    const pool = [...UPGRADES].sort(() => Math.random() - 0.5).slice(0, 3);
+    state.activeUpgrades = pool;
+    upgList.innerHTML = '';
+    pool.forEach((u, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'upg-card';
+      btn.innerHTML = `<div class="upg-icon" style="background:${u.bg}">${u.icon}</div><div><div class="upg-title">${idx + 1}. ${u.title}</div><div class="upg-desc">${u.desc}</div></div>`;
+      btn.addEventListener('click', () => selectUpgrade(idx));
+      upgList.appendChild(btn);
+    });
+    upgOverlay.classList.add('show');
+  }
+
+  // --- Sector / Daily Clear ---
+  function triggerSectorClear() {
+    state.phase = 'clear';
+    CG.gameplayStop();
+    CG.happytime();
+    AudioSys.playVictory();
+    const sec = currentSector();
+    const lowestRow = state.blocks.reduce((m, b) => Math.max(m, b.row), 0);
+    const starsEarned = !state.revivedOnce ? (lowestRow <= 5 ? 3 : 2) : 1;
+
+    if (state.mode === 'daily') {
+      const today = todayUtcKey();
+      const firstToday = meta.dailyDoneDate !== today;
+      meta.dailyDoneDate = today;
+      meta.dailyBest = Math.max(meta.dailyBest, state.score);
+      if (firstToday) addCrystals(sec.reward);
+      unlockAchievement('daily1');
+      document.getElementById('clear-title').textContent = 'DAILY CHALLENGE CLEARED!';
+      document.getElementById('clear-sub').textContent = firstToday ? `Seed ${today} conquered` : `Seed ${today} replayed`;
+      document.getElementById('clear-reward').textContent = firstToday ? `+${sec.reward} ◆` : 'Claimed';
+      document.getElementById('btn-next-sector').textContent = 'Play Sector Campaign →';
+    } else {
+      meta.sectorStars[String(sec.id)] = Math.max(meta.sectorStars[String(sec.id)] || 0, starsEarned);
+      if (sec.id === 1) unlockAchievement('sec1');
+      if (sec.id < SECTORS.length) meta.unlockedSector = Math.max(meta.unlockedSector, sec.id + 1);
+      addCrystals(sec.reward);
+      document.getElementById('clear-title').textContent = `SECTOR ${sec.id} CLEARED!`;
+      document.getElementById('clear-sub').textContent = `${sec.name} conquered`;
+      document.getElementById('clear-reward').textContent = `+${sec.reward} ◆`;
+      document.getElementById('btn-next-sector').textContent = sec.id < SECTORS.length ? `Launch Sector ${sec.id + 1} →` : 'Play Endless Arcade Mode ∞';
+    }
+    saveMeta();
+    document.getElementById('clear-stars').textContent = '★'.repeat(starsEarned) + '☆'.repeat(3 - starsEarned);
+    document.getElementById('clear-score').textContent = state.score;
+    document.getElementById('clear-best').textContent = meta.best;
+    document.getElementById('clear-orbs').textContent = state.orbCount;
+    clearOverlay.classList.add('show');
+  }
+
+  // --- Sector Map UI ---
+  function renderSectorMap() {
+    sectorList.innerHTML = '';
+    SECTORS.forEach(sec => {
+      const unlocked = sec.id <= (meta.unlockedSector || 1);
+      const st = meta.sectorStars[String(sec.id)] || 0;
+      const card = document.createElement('button');
+      card.className = 'sector-card' + (state.mode === 'sector' && state.sectorId === sec.id ? ' active' : '');
+      card.disabled = !unlocked;
+      card.innerHTML = `
+        <div class="sector-top">
+          <span style="color:${unlocked ? sec.accent : '#64748B'}">${unlocked ? 'SECTOR ' + sec.id : '🔒 SECTOR ' + sec.id}</span>
+          <span class="sector-stars">${'★'.repeat(st)}${'☆'.repeat(3 - st)}</span>
+        </div>
+        <div class="sector-name">${sec.name} · ${sec.waves} Waves</div>
+      `;
+      card.addEventListener('click', () => {
+        if (!unlocked) return;
+        AudioSys.unlock();
+        resetGame('sector', sec.id);
+      });
+      sectorList.appendChild(card);
+    });
+    const dailyBtn = document.getElementById('btn-daily');
+    const doneToday = meta.dailyDoneDate === todayUtcKey();
+    dailyBtn.textContent = doneToday
+      ? `📅 Replay Daily Challenge (Best: ${meta.dailyBest})`
+      : '📅 Daily Challenge (5 Waves · +40 ◆ Bonus)';
+  }
+
+  function openOverlay(name) {
+    if (state.phase === 'shoot') return;
+    if (!['shop', 'sectors', 'ach'].includes(state.phase)) state.prevPhase = state.phase;
+    state.phase = name;
+    CG.gameplayStop();
+    [overOverlay, clearOverlay, shopOverlay, sectorOverlay, achOverlay].forEach(el => el.classList.remove('show'));
+    if (name === 'sectors') { renderSectorMap(); sectorOverlay.classList.add('show'); }
+    if (name === 'shop') { renderShop(); shopOverlay.classList.add('show'); }
+    if (name === 'ach') { renderAchievements(); achOverlay.classList.add('show'); }
+  }
+
+  function closeModalOverlay() {
+    [shopOverlay, sectorOverlay, achOverlay].forEach(el => el.classList.remove('show'));
+    if (state.prevPhase === 'over') { state.phase = 'over'; refreshOverButtons(); overOverlay.classList.add('show'); }
+    else if (state.prevPhase === 'clear') { state.phase = 'clear'; clearOverlay.classList.add('show'); }
+    else { state.phase = 'aim'; CG.gameplayStart(); }
+  }
+
+  function renderAchievements() {
+    achList.innerHTML = '';
+    ACHIEVEMENTS.forEach(a => {
+      const done = meta.achievements.includes(a.id);
+      const row = document.createElement('div');
+      row.className = 'ach-row' + (done ? ' done' : '');
+      row.innerHTML = `<div class="shop-info"><div class="t">${done ? '🏆 ' : ''}${a.title}</div><div class="d">${a.desc}</div></div><div class="ach-badge ${done ? 'done' : 'todo'}">${done ? 'DONE' : '+' + a.reward + ' ◆'}</div>`;
+      achList.appendChild(row);
+    });
+  }
+
+  // --- Persistent Crystal Hangar Shop ---
+  function renderShop() {
+    shopBalance.textContent = `${meta.crystals} ◆`;
+    shopUpgrades.innerHTML = '';
+    META_UPGRADES.forEach(up => {
+      const lvl = meta[up.key] || 0;
+      const maxed = lvl >= up.max;
+      const cost = up.baseCost + lvl * up.stepCost;
+      const row = document.createElement('div');
+      row.className = 'shop-row';
+      row.innerHTML = `<div class="shop-info"><div class="t">${up.name} (Lv.${lvl}/${up.max})</div><div class="d">${up.desc(lvl)}</div></div>`;
+      const btn = document.createElement('button');
+      btn.className = 'shop-buy' + (maxed ? ' owned' : '');
+      btn.textContent = maxed ? 'MAXED' : `Buy ${cost} ◆`;
+      btn.disabled = maxed || meta.crystals < cost;
+      btn.addEventListener('click', () => {
+        if (maxed || meta.crystals < cost) return;
+        meta.crystals -= cost;
+        meta[up.key] = lvl + 1;
+        if (up.key === 'lvlOrbs') state.orbCount += 1;
+        if (up.key === 'lvlDmg') state.orbDamage += 1;
+        saveMeta();
+        syncHUD();
+        AudioSys.playPickup();
+        renderShop();
+      });
+      row.appendChild(btn);
+      shopUpgrades.appendChild(row);
+    });
+
+    shopSkins.innerHTML = '';
+    SKINS.forEach(sk => {
+      const owned = meta.ownedSkins.includes(sk.id);
+      const equipped = meta.skin === sk.id;
+      const card = document.createElement('div');
+      card.className = 'skin-card';
+      card.innerHTML = `<div class="skin-swatch" style="background:${sk.core};border-color:${sk.stroke};box-shadow:0 0 12px ${sk.stroke}"></div><div class="skin-name">${sk.name}</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'shop-buy' + (equipped ? ' equipped' : (owned ? ' owned' : ''));
+      btn.textContent = equipped ? 'Equipped' : (owned ? 'Equip' : `${sk.cost} ◆`);
+      btn.disabled = !owned && meta.crystals < sk.cost;
+      btn.addEventListener('click', () => {
+        if (equipped) return;
+        if (!owned) {
+          if (meta.crystals < sk.cost) return;
+          meta.crystals -= sk.cost;
+          meta.ownedSkins.push(sk.id);
+        }
+        meta.skin = sk.id;
+        saveMeta();
+        syncHUD();
+        AudioSys.playPickup();
+        renderShop();
+      });
+      card.appendChild(btn);
+      shopSkins.appendChild(card);
+    });
+  }
+
+  // --- End of Turn / Advance Wave ---
+  function finishTurn() {
+    shootControls.classList.remove('show');
+    comboBadge.classList.remove('show');
+    state.fastForward = false;
+    state.overdriveActive = false;
+    speedBtn.classList.remove('active');
+    speedBtn.textContent = '2x Speed';
+    if (state.nextLauncherX !== null) {
+      state.launcherX = Math.max(board.x + 20, Math.min(board.x + board.w - 20, state.nextLauncherX));
+      state.nextLauncherX = null;
+    }
+
+    if (state.mode === 'sector' || state.mode === 'daily') {
+      const sec = currentSector();
+      if (state.wave >= sec.waves && state.blocks.length === 0) {
+        triggerSectorClear();
+        return;
+      }
+    }
+
+    state.wave += 1;
+    state.combo = 0;
+
+    let breached = false;
+    state.blocks.forEach(b => {
+      b.row += 1;
+      b.usedSplit = false;
+      if (b.row >= ROWS) breached = true;
+    });
+    state.pickups = state.pickups.filter(p => {
+      p.row += 1;
+      return p.row < ROWS;
+    });
+
+    if (breached) { triggerGameOver(); return; }
+
+    const sec = currentSector();
+    if (state.mode === 'endless' || state.wave <= sec.waves) spawnRow(0);
+    syncHUD();
+
+    if (state.wave % 3 === 1 && state.wave > 1 && (state.mode === 'endless' || state.wave <= sec.waves)) {
+      showUpgradeMenu();
+    } else {
+      state.phase = 'aim';
+    }
+  }
+
+  function refreshOverButtons() {
+    const canOfferRevive = !state.revivedOnce && state.wave >= 2;
+    btnReviveAd.style.display = (canOfferRevive && !CG.hasAdblock && !CG.rewardedUnavailable && CG.PLATFORM !== 'itch') ? 'block' : 'none';
+    if (canOfferRevive) {
+      btnReviveCrystal.style.display = 'block';
+      const hasEnough = meta.crystals >= 15;
+      btnReviveCrystal.disabled = !hasEnough;
+      btnReviveCrystal.classList.toggle('btn-disabled', !hasEnough);
+      btnReviveCrystal.textContent = hasEnough
+        ? '◆ Spend 15 Crystals: Clear Bottom 2 Rows & Continue'
+        : `◆ Need 15 Crystals to Continue (You have ${meta.crystals})`;
+    } else {
+      btnReviveCrystal.style.display = 'none';
+    }
+  }
+
+  function triggerGameOver() {
+    state.phase = 'over';
+    CG.gameplayStop();
+    AudioSys.playBoom();
+    document.getElementById('over-wave').textContent = state.wave;
+    document.getElementById('over-score').textContent = state.score;
+    document.getElementById('over-best').textContent = meta.best;
+    document.getElementById('over-crystals').textContent = `+${state.runCrystals} ◆`;
+    refreshOverButtons();
+    overOverlay.classList.add('show');
+  }
+
+  function applyRevive() {
+    state.revivedOnce = true;
+    state.blocks = state.blocks.filter(b => b.row < ROWS - 2);
+    overOverlay.classList.remove('show');
+    state.phase = 'aim';
+    CG.gameplayStart();
+    AudioSys.playPickup();
+    addPopup(board.x + board.w / 2, board.y + board.h * 0.65, 'BOTTOM ROWS CLEARED!', '#34D399');
+  }
+
+  // --- Launch Volley ---
+  function launchVolley(angle) {
+    if (state.phase !== 'aim') return;
+    AudioSys.unlock();
+    hasFiredFirstShot = true;
+    hintEl.style.opacity = '0';
+    state.phase = 'shoot';
+    state.fireAngle = angle;
+    state.orbsToFire = state.orbCount;
+    state.fireTimer = 0;
+    state.nextLauncherX = null;
+    state.shootElapsed = 0;
+    state.fastForward = false;
+    state.overdriveActive = state.overdriveNextTurn;
+    state.overdriveNextTurn = false;
+    if (state.overdriveActive) addPopup(state.launcherX, state.launcherY - 26, '⚡ 2x OVERDRIVE VOLLEY!', '#FBBF24');
+    syncHUD();
+    speedBtn.classList.remove('active');
+    speedBtn.textContent = '2x Speed';
+    shootControls.classList.add('show');
+  }
+
+  // --- Block Helpers & Special Effects ---
+  function blockRect(b) {
+    const pad = board.pad;
+    return {
+      x: board.x + b.col * board.cell + pad,
+      y: board.y + b.row * board.cell + pad,
+      w: board.cell - pad * 2,
+      h: board.cell - pad * 2
+    };
+  }
+
+  function onBlockDestroyed(b) {
+    const r = blockRect(b);
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    state.blocksCleared += 1;
+
+    if (b.type === 'boss') {
+      AudioSys.playBoom();
+      state.shake = Math.min(18, state.shake + 14);
+      state.hitstop = 0.045;
+      emitParticles(cx, cy, '#F472B6', 36);
+      addRing(cx, cy, '#FDE047', board.cell * 3.0);
+      addPopup(cx, cy, 'BOSS DEFEATED!', '#FDE047');
+      addScore(180);
+      addCrystals(15, cx, cy);
+      meta.bossKills = (meta.bossKills || 0) + 1;
+      saveMeta();
+      if (meta.bossKills >= 3) unlockAchievement('boss3');
+      if (state.mode === 'endless') CG.happytime();
+      return;
+    }
+
+    if (b.type === 'bomb') {
+      explodeBomb(b);
+      addScore(25);
+      addCrystals(3, cx, cy);
+      return;
+    }
+
+    if (b.type === 'laser') {
+      fireRowLaser(b);
+      addScore(25);
+      addCrystals(2, cx, cy);
+      return;
+    }
+
+    emitParticles(cx, cy, b.type === 'tank' ? '#F472B6' : (b.type === 'splitter' ? '#34D399' : '#38BDF8'), 12);
+    state.shake = Math.min(8, state.shake + 2.2);
+    addScore(10);
+    if (state.blocksCleared % 5 === 0) addCrystals(1, cx, cy);
+  }
+
+  function explodeBomb(bombBlock) {
+    AudioSys.playBoom();
+    state.shake = Math.min(15, state.shake + 9);
+    state.hitstop = 0.025;
+    const br = blockRect(bombBlock);
+    const cx = br.x + br.w / 2, cy = br.y + br.h / 2;
+    emitParticles(cx, cy, '#FBBF24', 26);
+    addRing(cx, cy, '#FBBF24', board.cell * 2.1);
+    addPopup(cx, cy, 'SHOCKWAVE!', '#FDE047');
+
+    const splashDmg = Math.max(2, state.orbDamage * state.bombPower + Math.floor(state.wave * 0.6));
+    const toDestroy = [];
+    state.blocks.forEach(other => {
+      if (other === bombBlock || other.hp <= 0) return;
+      if (Math.abs(other.col - bombBlock.col) <= 1 && Math.abs(other.row - bombBlock.row) <= 1) {
+        other.shield = false;
+        other.hp -= splashDmg;
+        other.hitFlash = 1;
+        if (other.hp <= 0) toDestroy.push(other);
+      }
+    });
+    toDestroy.forEach(d => onBlockDestroyed(d));
+  }
+
+  function fireRowLaser(laserBlock) {
+    AudioSys.playLaser();
+    state.shake = Math.min(12, state.shake + 6);
+    const br = blockRect(laserBlock);
+    const cy = br.y + br.h / 2;
+    state.beams.push({ y: cy, life: 0.3, maxLife: 0.3 });
+    addPopup(br.x + br.w / 2, cy, 'LASER SWEEP!', '#38BDF8');
+
+    const laserDmg = Math.max(2, state.orbDamage * state.bombPower + Math.floor(state.wave * 0.55));
+    const toDestroy = [];
+    state.blocks.forEach(other => {
+      if (other === laserBlock || other.hp <= 0) return;
+      if (other.row === laserBlock.row) {
+        other.shield = false;
+        other.hp -= laserDmg;
+        other.hitFlash = 1;
+        if (other.hp <= 0) toDestroy.push(other);
+      }
+    });
+    toDestroy.forEach(d => onBlockDestroyed(d));
+  }
+
+  // --- Physics Step (100% dt-normalized for 60Hz/144Hz/165Hz consistency) ---
+  function update(dt) {
+    tutorialClock += dt;
+    nebulae.forEach(nb => {
+      nb.x += nb.vx * dt; nb.y += nb.vy * dt;
+      if (nb.x < 0.15 || nb.x > 0.85) nb.vx *= -1;
+      if (nb.y < 0.18 || nb.y > 0.82) nb.vy *= -1;
+    });
+    stars.forEach(st => {
+      st.y += st.speed * dt;
+      st.tw += dt * (1.8 + st.layer);
+      if (st.y > 1) { st.y = 0; st.x = Math.random(); }
+    });
+
+    if (state.hitstop > 0) { state.hitstop = Math.max(0, state.hitstop - dt); return; }
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 34);
+    if (state.recoil > 0) state.recoil = Math.max(0, state.recoil - dt * 28);
+
+    // True frame-rate independent damping: Math.pow(0.045, dt) ~ 0.95 per 1/60s frame
+    const damp = Math.pow(0.045, dt);
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vx *= damp; p.vy *= damp;
+      p.life -= dt;
+      if (p.life <= 0) state.particles.splice(i, 1);
+    }
+    for (let i = state.rings.length - 1; i >= 0; i--) {
+      const rg = state.rings[i];
+      rg.life -= dt;
+      rg.r = rg.maxR * (1 - rg.life / rg.maxLife);
+      if (rg.life <= 0) state.rings.splice(i, 1);
+    }
+    for (let i = state.beams.length - 1; i >= 0; i--) {
+      state.beams[i].life -= dt;
+      if (state.beams[i].life <= 0) state.beams.splice(i, 1);
+    }
+    for (let i = state.popups.length - 1; i >= 0; i--) {
+      const pop = state.popups[i];
+      pop.y -= 38 * dt;
+      pop.life -= dt;
+      if (pop.life <= 0) state.popups.splice(i, 1);
+    }
+
+    state.blocks.forEach(b => { if (b.hitFlash > 0) b.hitFlash = Math.max(0, b.hitFlash - dt * 7); });
+    state.pickups.forEach(p => { p.pulse += dt * 4; });
+
+    if (state.phase !== 'shoot') return;
+
+    state.shootElapsed += dt;
+    let speedMult = 1;
+    if (state.fastForward) speedMult = 2.0;
+    else if (state.shootElapsed > 4.5) speedMult = 1.75;
+    if (state.shootElapsed > 10) speedMult = 2.45;
+
+    const effDt = dt * speedMult;
+    const baseSpeed = Math.max(475, board.cell * 11.5) * state.extraBounceSpeed;
+
+    if (state.orbsToFire > 0) {
+      state.fireTimer -= effDt;
+      if (state.fireTimer <= 0) {
+        state.fireTimer = 0.05;
+        state.orbsToFire -= 1;
+        state.recoil = 5;
+        if (state.orbsToFire % 2 === 0) AudioSys.playShootTick();
+        state.activeOrbs.push({
+          x: state.launcherX, y: state.launcherY,
+          vx: Math.cos(state.fireAngle) * baseSpeed,
+          vy: Math.sin(state.fireAngle) * baseSpeed,
+          r: Math.max(5.5, board.cell * 0.13),
+          shadow: false, trail: []
+        });
+      }
+    }
+
+    const subSteps = speedMult > 1.8 ? 5 : 3;
+    const subDt = effDt / subSteps;
+
+    // Sample orb trails at fixed ~60Hz interval so trails look identical on 144Hz/165Hz
+    state.trailAcc += dt;
+    const sampleTrail = state.trailAcc >= 0.016;
+    if (sampleTrail) state.trailAcc = 0;
+
+    for (let i = state.activeOrbs.length - 1; i >= 0; i--) {
+      const o = state.activeOrbs[i];
+      let removed = false;
+
+      for (let s = 0; s < subSteps; s++) {
+        o.x += o.vx * subDt;
+        o.y += o.vy * subDt;
+
+        if (o.x - o.r < board.x) { o.x = board.x + o.r; o.vx = Math.abs(o.vx); }
+        if (o.x + o.r > board.x + board.w) { o.x = board.x + board.w - o.r; o.vx = -Math.abs(o.vx); }
+        if (o.y - o.r < board.y) { o.y = board.y + o.r; o.vy = Math.abs(o.vy); }
+        if (Math.abs(o.vy) < 55) o.vy += (o.vy >= 0 ? 22 : -22);
+
+        if (o.y + o.r >= state.launcherY + 4 && o.vy > 0) {
+          if (!o.shadow && state.nextLauncherX === null) state.nextLauncherX = o.x;
+          state.activeOrbs.splice(i, 1);
+          removed = true;
+          break;
+        }
+
+        // Pickups (+1 Orb or Overdrive Capsule)
+        for (let k = state.pickups.length - 1; k >= 0; k--) {
+          const pk = state.pickups[k];
+          const px = board.x + (pk.col + 0.5) * board.cell;
+          const py = board.y + (pk.row + 0.5) * board.cell;
+          const dx = o.x - px, dy = o.y - py;
+          if (dx * dx + dy * dy < (o.r + board.cell * 0.25) ** 2) {
+            state.pickups.splice(k, 1);
+            AudioSys.playPickup();
+            if (pk.kind === 'overdrive') {
+              state.overdriveNextTurn = true;
+              syncHUD();
+              emitParticles(px, py, '#FBBF24', 12);
+              addPopup(px, py, '⚡ 2x DMG NEXT!', '#FBBF24');
+            } else {
+              state.orbCount += 1;
+              syncHUD();
+              emitParticles(px, py, '#34D399', 10);
+              addPopup(px, py, '+1 ORB', '#34D399');
+            }
+          }
+        }
+
+        // Blocks collision
+        for (let k = state.blocks.length - 1; k >= 0; k--) {
+          const b = state.blocks[k];
+          if (b.hp <= 0) continue;
+          const r = blockRect(b);
+          const closestX = Math.max(r.x, Math.min(o.x, r.x + r.w));
+          const closestY = Math.max(r.y, Math.min(o.y, r.y + r.h));
+          const dx = o.x - closestX;
+          const dy = o.y - closestY;
+          if (dx * dx + dy * dy <= o.r * o.r) {
+            if (Math.abs(dx) > Math.abs(dy)) o.vx = dx > 0 ? Math.abs(o.vx) : -Math.abs(o.vx);
+            else o.vy = dy > 0 ? Math.abs(o.vy) : -Math.abs(o.vy);
+
+            if (b.shield && dy > 0 && Math.abs(dy) >= Math.abs(dx)) {
+              b.shield = false;
+              b.hitFlash = 0.8;
+              AudioSys.playShieldClink();
+              emitParticles(closestX, closestY, '#94A3B8', 8);
+              addPopup(closestX, closestY - 4, 'SHIELD BREAK', '#CBD5E1');
+              break;
+            }
+
+            const isCrit = Math.random() < state.critChance;
+            const dmg = state.orbDamage * (state.overdriveActive ? 2 : 1) * (isCrit ? 2 : 1);
+            b.hp -= dmg;
+            b.hitFlash = 1;
+            state.combo += 1;
+            AudioSys.playHit(state.combo);
+            addScore(dmg * (state.combo >= 12 ? 2 : 1));
+            if (state.combo >= 6) {
+              const label = state.combo >= 25 ? 'OVERDRIVE!' : (state.combo >= 15 ? 'UNSTOPPABLE!' : 'COMBO');
+              comboBadge.textContent = `${state.combo}x ${label}`;
+              comboBadge.classList.add('show');
+              if (state.combo >= 25) unlockAchievement('combo25');
+            }
+            if (isCrit) addPopup(closestX, closestY - 6, `CRIT -${dmg}`, '#FBBF24');
+
+            if (b.type === 'splitter' && !b.usedSplit && state.activeOrbs.length < 75) {
+              b.usedSplit = true;
+              const ang = Math.atan2(o.vy, o.vx) + (Math.random() > 0.5 ? 0.35 : -0.35);
+              state.activeOrbs.push({
+                x: o.x, y: o.y,
+                vx: Math.cos(ang) * baseSpeed, vy: Math.sin(ang) * baseSpeed,
+                r: o.r * 0.85, shadow: true, trail: []
+              });
+              addPopup(r.x + r.w / 2, r.y, 'SPLIT!', '#34D399');
+            }
+
+            if (b.hp <= 0) onBlockDestroyed(b);
+            break;
+          }
+        }
+      }
+
+      if (!removed && sampleTrail) {
+        o.trail.push({ x: o.x, y: o.y });
+        if (o.trail.length > 8) o.trail.shift();
+      }
+    }
+
+    state.blocks = state.blocks.filter(b => b.hp > 0);
+    if (state.orbsToFire === 0 && state.activeOrbs.length === 0) finishTurn();
+  }
+
+  // --- Rendering ---
+  function drawRoundedRect(x, y, w, h, rad) {
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rad);
+    ctx.arcTo(x + w, y + h, x, y + h, rad);
+    ctx.arcTo(x, y + h, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+  }
+
+  function blockColor(b) {
+    if (b.type === 'boss')     return { fill: '#BE185D', top: '#F472B6', stroke: '#FDE047' };
+    if (b.type === 'bomb')     return { fill: '#D97706', top: '#FBBF24', stroke: '#FEF08A' };
+    if (b.type === 'laser')    return { fill: '#0369A1', top: '#38BDF8', stroke: '#BAE6FD' };
+    if (b.type === 'splitter') return { fill: '#047857', top: '#34D399', stroke: '#A7F3D0' };
+    if (b.type === 'tank')     return { fill: '#9D174D', top: '#EC4899', stroke: '#F9A8D4' };
+    const ratio = Math.min(1, b.hp / Math.max(8, state.wave * 1.5));
+    if (ratio > 0.66) return { fill: '#6D28D9', top: '#8B5CF6', stroke: '#C4B5FD' };
+    if (ratio > 0.33) return { fill: '#1D4ED8', top: '#3B82F6', stroke: '#93C5FD' };
+    return { fill: '#0F766E', top: '#14B8A6', stroke: '#5EEAD4' };
+  }
+
+  function drawAimTrajectory() {
+    const sk = currentSkin();
+    ctx.save();
+    ctx.strokeStyle = state.overdriveNextTurn ? '#FBBF24' : sk.stroke;
+    ctx.globalAlpha = 0.88;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([7, 7]);
+
+    let x = state.launcherX, y = state.launcherY;
+    let dx = Math.cos(state.aimAngle), dy = Math.sin(state.aimAngle);
+    let remaining = board.h * 0.96;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+
+    for (let bounce = 0; bounce < 2 && remaining > 10; bounce++) {
+      let tWall = remaining, hitX = false, hitY = false;
+      if (dx < -0.001) {
+        const t = (board.x + 8 - x) / dx;
+        if (t > 0 && t < tWall) { tWall = t; hitX = true; hitY = false; }
+      } else if (dx > 0.001) {
+        const t = (board.x + board.w - 8 - x) / dx;
+        if (t > 0 && t < tWall) { tWall = t; hitX = true; hitY = false; }
+      }
+      if (dy < -0.001) {
+        const t = (board.y + 8 - y) / dy;
+        if (t > 0 && t < tWall) { tWall = t; hitX = false; hitY = true; }
+      }
+      x += dx * tWall; y += dy * tWall;
+      ctx.lineTo(x, y);
+      remaining -= tWall;
+      if (hitX) dx = -dx;
+      else if (hitY) dy = -dy;
+      else break;
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTurret(sk) {
+    const ang = state.phase === 'shoot' ? state.fireAngle : state.aimAngle;
+    const rx = Math.cos(ang) * -state.recoil;
+    const ry = Math.sin(ang) * -state.recoil;
+
+    ctx.save();
+    ctx.translate(state.launcherX + rx, state.launcherY + ry);
+    ctx.rotate(ang + Math.PI / 2);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.strokeStyle = state.overdriveActive || state.overdriveNextTurn ? 'rgba(251, 191, 36, 0.7)' : `rgba(${sk.trail}, 0.45)`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = state.overdriveActive || state.overdriveNextTurn ? '#FBBF24' : sk.stroke;
+    drawRoundedRect(-5, -17, 10, 14, 4);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+    ctx.fillStyle = sk.core;
+    ctx.fill();
+    ctx.strokeStyle = sk.stroke;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function render() {
+    const sec = currentSector();
+    const grad = ctx.createRadialGradient(W * 0.5, H * 0.4, 30, W * 0.5, H * 0.5, Math.max(W, H) * 0.78);
+    grad.addColorStop(0, (state.mode === 'sector' || state.mode === 'daily') ? sec.bgA : '#132247');
+    grad.addColorStop(1, (state.mode === 'sector' || state.mode === 'daily') ? sec.bgB : '#050812');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    if (state.shake > 0.2) {
+      ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
+    }
+
+    // Parallax Nebula Layers
+    nebulae.forEach((nb, idx) => {
+      const nr = Math.max(W, H) * nb.r;
+      const ng = ctx.createRadialGradient(nb.x * W, nb.y * H, 8, nb.x * W, nb.y * H, nr);
+      ng.addColorStop(0, idx === 0 ? 'rgba(56, 189, 248, 0.11)' : 'rgba(192, 132, 252, 0.10)');
+      ng.addColorStop(1, 'rgba(5, 8, 18, 0)');
+      ctx.fillStyle = ng;
+      ctx.fillRect(0, 0, W, H);
+    });
+    const parallaxOffset = (state.aimAngle + Math.PI / 2) * 14;
+    stars.forEach(st => {
+      const twAlpha = Math.max(0.08, Math.min(0.95, st.a + Math.sin(st.tw) * 0.12));
+      ctx.fillStyle = st.layer === 2 ? `rgba(186, 230, 253, ${twAlpha})` : `rgba(226, 232, 240, ${twAlpha})`;
+      const sx = ((st.x * W + parallaxOffset * (st.layer + 1) * 0.35) % W + W) % W;
+      ctx.beginPath();
+      ctx.arc(sx, st.y * H, st.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    drawRoundedRect(board.x, board.y, board.w, board.h, 14);
+    ctx.fillStyle = 'rgba(7, 12, 26, 0.85)';
+    ctx.fill();
+    ctx.strokeStyle = (state.mode === 'sector' || state.mode === 'daily') ? sec.accent : 'rgba(56, 189, 248, 0.42)';
+    ctx.globalAlpha = 0.52;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.06)';
+    ctx.lineWidth = 1;
+    for (let c = 1; c < COLS; c++) {
+      ctx.beginPath();
+      ctx.moveTo(board.x + c * board.cell, board.y);
+      ctx.lineTo(board.x + c * board.cell, board.y + board.h);
+      ctx.stroke();
+    }
+    const dangerY = board.y + ROWS * board.cell;
+    ctx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(board.x + 8, dangerY);
+    ctx.lineTo(board.x + board.w - 8, dangerY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    state.beams.forEach(bm => {
+      const a = Math.max(0, bm.life / bm.maxLife);
+      ctx.fillStyle = `rgba(56, 189, 248, ${a * 0.55})`;
+      ctx.fillRect(board.x + 4, bm.y - 11 * a, board.w - 8, 22 * a);
+      ctx.fillStyle = `rgba(224, 242, 254, ${a})`;
+      ctx.fillRect(board.x + 4, bm.y - 3 * a, board.w - 8, 6 * a);
+    });
+
+    // Pickups (+1 Orb & Overdrive Capsule)
+    state.pickups.forEach(p => {
+      const px = board.x + (p.col + 0.5) * board.cell;
+      const py = board.y + (p.row + 0.5) * board.cell;
+      const rad = board.cell * 0.2 + Math.sin(p.pulse) * 2.1;
+      const isOd = p.kind === 'overdrive';
+      ctx.beginPath();
+      ctx.arc(px, py, rad + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = isOd ? 'rgba(251, 191, 36, 0.65)' : 'rgba(52, 211, 153, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px, py, rad * 0.72, 0, Math.PI * 2);
+      ctx.fillStyle = isOd ? '#FBBF24' : '#34D399';
+      ctx.fill();
+      ctx.fillStyle = isOd ? '#451A03' : '#064E3B';
+      ctx.font = `800 ${Math.max(10, Math.floor(board.cell * 0.24))}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(isOd ? '⚡' : '+', px, py + 1);
+    });
+
+    // Blocks
+    state.blocks.forEach(b => {
+      const r = blockRect(b);
+      const col = blockColor(b);
+      drawRoundedRect(r.x, r.y, r.w, r.h, 8);
+      if (b.hitFlash > 0.2) {
+        ctx.fillStyle = '#FFFFFF';
+      } else {
+        const bg = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+        bg.addColorStop(0, col.top);
+        bg.addColorStop(1, col.fill);
+        ctx.fillStyle = bg;
+      }
+      ctx.fill();
+      ctx.strokeStyle = col.stroke;
+      ctx.lineWidth = (b.type === 'bomb' || b.type === 'boss') ? 2.5 : 1.5;
+      ctx.stroke();
+
+      if (b.hitFlash <= 0.2) {
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        drawRoundedRect(r.x + 3, r.y + 3, r.w - 6, Math.max(4, r.h * 0.24), 4);
+        ctx.fill();
+      }
+      if (b.hp < b.maxHp * 0.5 && b.hitFlash <= 0.2) {
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.w * 0.25, r.y + r.h * 0.2);
+        ctx.lineTo(r.x + r.w * 0.48, r.y + r.h * 0.52);
+        ctx.lineTo(r.x + r.w * 0.72, r.y + r.h * 0.78);
+        ctx.stroke();
+      }
+      if (b.shield) {
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillRect(r.x + 4, r.y + r.h - 5, r.w - 8, 4);
+      }
+      if (b.type === 'boss') {
+        const pct = Math.max(0, b.hp / b.maxHp);
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(r.x + 5, r.y + r.h - 7, r.w - 10, 4);
+        ctx.fillStyle = '#FDE047';
+        ctx.fillRect(r.x + 5, r.y + r.h - 7, (r.w - 10) * pct, 4);
+      }
+
+      ctx.fillStyle = b.hitFlash > 0.2 ? '#0F172A' : '#FFFFFF';
+      ctx.font = `800 ${Math.max(11, Math.floor(board.cell * 0.29))}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      let prefix = '';
+      if (b.type === 'bomb') prefix = '✦';
+      else if (b.type === 'laser') prefix = '⚡';
+      else if (b.type === 'splitter') prefix = '❖';
+      else if (b.type === 'boss') prefix = '★';
+      ctx.fillText(`${prefix}${b.hp}`, r.x + r.w / 2, r.y + r.h / 2);
+    });
+
+    if (state.phase === 'aim' && state.aiming) {
+      drawAimTrajectory();
+    } else if (state.phase === 'aim' && !hasFiredFirstShot && state.wave === 1) {
+      // Visual-only animated drag & release tutorial overlay (zero text walls)
+      const sweep = -Math.PI / 2 + Math.sin(tutorialClock * 2.3) * 0.58;
+      const gx = state.launcherX + Math.cos(sweep) * (board.cell * 2.35);
+      const gy = state.launcherY + Math.sin(sweep) * (board.cell * 2.35);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.62)';
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(state.launcherX, state.launcherY);
+      ctx.lineTo(gx, gy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Glowing animated target reticle + touch ripple
+      const pulseR = 11 + Math.sin(tutorialClock * 5) * 3.5;
+      ctx.beginPath();
+      ctx.arc(gx, gy, pulseR, 0, Math.PI * 2);
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(gx, gy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#FDE047';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const sk = currentSkin();
+    drawTurret(sk);
+
+    state.activeOrbs.forEach(o => {
+      const tr = o.shadow ? '52, 211, 153' : (state.overdriveActive ? '251, 191, 36' : sk.trail);
+      for (let t = 0; t < o.trail.length; t++) {
+        const pt = o.trail[t];
+        const alpha = (t + 1) / (o.trail.length + 1) * 0.48;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, o.r * (0.38 + 0.55 * (t / o.trail.length)), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${tr}, ${alpha})`;
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fillStyle = o.shadow ? '#D1FAE5' : (state.overdriveActive ? '#FEF3C7' : sk.core);
+      ctx.fill();
+      ctx.strokeStyle = o.shadow ? '#10B981' : (state.overdriveActive ? '#F59E0B' : sk.stroke);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    state.rings.forEach(rg => {
+      ctx.globalAlpha = Math.max(0, rg.life / rg.maxLife);
+      ctx.beginPath();
+      ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI * 2);
+      ctx.strokeStyle = rg.color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    state.particles.forEach(p => {
+      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    state.popups.forEach(pop => {
+      ctx.globalAlpha = Math.max(0, pop.life / pop.maxLife);
+      ctx.font = '800 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = pop.color;
+      ctx.fillText(pop.text, pop.x, pop.y);
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  // --- Pointer / Touch Aiming ---
+  function updateAimFromPoint(px, py) {
+    const dx = px - state.launcherX;
+    const dy = py - state.launcherY;
+    let ang = Math.atan2(dy, dx);
+    if (ang > -0.14 && ang <= Math.PI / 2) ang = -0.14;
+    if (ang > Math.PI / 2 || ang < -Math.PI + 0.14) ang = -Math.PI + 0.14;
+    state.aimAngle = ang;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if (state.phase !== 'aim') return;
+    AudioSys.unlock();
+    state.aiming = true;
+    updateAimFromPoint(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('pointermove', e => {
+    if (!state.aiming || state.phase !== 'aim') return;
+    updateAimFromPoint(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('pointerup', () => {
+    if (!state.aiming || state.phase !== 'aim') return;
+    state.aiming = false;
+    launchVolley(state.aimAngle);
+  });
+
+  window.addEventListener('blur', () => { state.aiming = false; });
+  document.addEventListener('visibilitychange', () => {
+    AudioSys.setTabHidden(document.hidden);
+    if (document.hidden) state.aiming = false;
+  });
+
+  // --- UI Buttons ---
+  document.getElementById('btn-mute').addEventListener('click', e => {
+    AudioSys.sfxMuted = !AudioSys.sfxMuted;
+    e.target.textContent = AudioSys.sfxMuted ? '🔇' : '🔊';
+  });
+
+  btnBgm.addEventListener('click', () => {
+    AudioSys.unlock();
+    AudioSys.bgmOn = !AudioSys.bgmOn;
+    meta.bgmOn = AudioSys.bgmOn;
+    saveMeta();
+    btnBgm.textContent = AudioSys.bgmOn ? '♫' : '♫✕';
+  });
+
+  document.getElementById('btn-sectors').addEventListener('click', () => openOverlay('sectors'));
+  document.getElementById('btn-clear-sectors').addEventListener('click', () => openOverlay('sectors'));
+  document.getElementById('btn-sector-close').addEventListener('click', closeModalOverlay);
+  document.getElementById('btn-daily').addEventListener('click', () => { AudioSys.unlock(); resetGame('daily'); });
+  document.getElementById('btn-endless').addEventListener('click', () => { AudioSys.unlock(); resetGame('endless'); });
+
+  document.getElementById('btn-shop').addEventListener('click', () => openOverlay('shop'));
+  document.getElementById('btn-over-shop').addEventListener('click', () => openOverlay('shop'));
+  document.getElementById('btn-clear-shop').addEventListener('click', () => openOverlay('shop'));
+  document.getElementById('btn-shop-close').addEventListener('click', closeModalOverlay);
+
+  document.getElementById('btn-ach').addEventListener('click', () => openOverlay('ach'));
+  document.getElementById('btn-ach-close').addEventListener('click', closeModalOverlay);
+
+  document.getElementById('btn-next-sector').addEventListener('click', () => {
+    const go = () => {
+      if (state.mode === 'daily') resetGame('sector', Math.min(SECTORS.length, meta.unlockedSector || 1));
+      else if (state.sectorId < SECTORS.length) resetGame('sector', state.sectorId + 1);
+      else resetGame('endless');
+    };
+    CG.requestAd('midgame', go);
+  });
+
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    if (state.wave >= 3) CG.requestAd('midgame', () => resetGame());
+    else resetGame();
+  });
+
+  speedBtn.addEventListener('click', () => {
+    state.fastForward = !state.fastForward;
+    speedBtn.classList.toggle('active', state.fastForward);
+    speedBtn.textContent = state.fastForward ? '2x ON' : '2x Speed';
+  });
+
+  recallBtn.addEventListener('click', () => {
+    if (state.phase !== 'shoot') return;
+    state.orbsToFire = 0;
+    state.activeOrbs = [];
+    finishTurn();
+  });
+
+  document.getElementById('btn-play-again').addEventListener('click', () => {
+    if (!state.revivedOnce && state.wave >= 3) CG.requestAd('midgame', () => resetGame());
+    else resetGame();
+  });
+
+  btnReviveAd.addEventListener('click', () => {
+    CG.requestAd('rewarded', (granted, errored) => {
+      if (granted) applyRevive();
+      else if (errored) {
+        refreshOverButtons();
+        showToast('Ad unavailable right now — use ◆ 15 Crystals to continue!');
+      }
+    });
+  });
+
+  btnReviveCrystal.addEventListener('click', () => {
+    if (meta.crystals < 15 || state.revivedOnce) return;
+    meta.crystals -= 15;
+    saveMeta();
+    syncHUD();
+    applyRevive();
+  });
+
+  // Keyboard support
+  window.addEventListener('keydown', e => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(e.key)) {
+      e.preventDefault();
+    }
+    if (e.key === 'm' || e.key === 'M') { document.getElementById('btn-mute').click(); return; }
+    if (e.key === 'b' || e.key === 'B') { btnBgm.click(); return; }
+    if (state.phase === 'upgrade') {
+      if (e.key === '1') selectUpgrade(0);
+      if (e.key === '2') selectUpgrade(1);
+      if (e.key === '3') selectUpgrade(2);
+      return;
+    }
+    if (state.phase === 'shoot' && (e.key === 'r' || e.key === 'R')) { recallBtn.click(); return; }
+    if (state.phase === 'aim') {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        state.aiming = true;
+        state.aimAngle = Math.max(-Math.PI + 0.14, state.aimAngle - 0.08);
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        state.aiming = true;
+        state.aimAngle = Math.min(-0.14, state.aimAngle + 0.08);
+      } else if (e.key === ' ' || e.key === 'Enter') {
+        state.aiming = false;
+        launchVolley(state.aimAngle);
+      }
+    }
+  }, { passive: false });
+
+  // --- Main Loop ---
+  let lastT = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.035, (now - lastT) / 1000);
+    lastT = now;
+    if (!CG.adPlaying && !document.hidden) update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  CG.init({
+    onMute: flag => AudioSys.setTempMute(flag),
+    onCloudData: raw => {
+      try {
+        const cloud = JSON.parse(raw);
+        meta.best = Math.max(meta.best, cloud.best || 0);
+        meta.crystals = Math.max(meta.crystals, cloud.crystals || 0);
+        meta.unlockedSector = Math.max(meta.unlockedSector, cloud.unlockedSector || 1);
+        meta.bossKills = Math.max(meta.bossKills, cloud.bossKills || 0);
+        meta.lvlOrbs = Math.max(meta.lvlOrbs, cloud.lvlOrbs || 0);
+        meta.lvlDmg = Math.max(meta.lvlDmg, cloud.lvlDmg || 0);
+        meta.lvlCrystals = Math.max(meta.lvlCrystals, cloud.lvlCrystals || 0);
+        if (cloud.sectorStars) {
+          Object.keys(cloud.sectorStars).forEach(k => {
+            meta.sectorStars[k] = Math.max(meta.sectorStars[k] || 0, cloud.sectorStars[k] || 0);
+          });
+        }
+        syncHUD();
+      } catch (e) {}
+    }
+  });
+  resetGame('sector', Math.min(SECTORS.length, meta.unlockedSector || 1));
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
