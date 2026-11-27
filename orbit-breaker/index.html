@@ -352,6 +352,7 @@
         <div class="stat-box"><div class="lbl">Orbs</div><div class="val" id="clear-orbs">3</div></div>
       </div>
       <div class="btn-stack">
+        <button class="btn-reward" id="btn-double-clear">▶ Watch Ad: Double Crystal Bonus (2x ◆)</button>
         <button class="btn-primary" id="btn-next-sector">Launch Next Sector →</button>
         <button class="btn-secondary" id="btn-clear-shop">◆ Upgrade in Plasma Hangar</button>
         <button class="btn-secondary" id="btn-clear-sectors">★ Modes &amp; Star Map</button>
@@ -388,6 +389,7 @@
     <div class="panel">
       <h2>PLASMA HANGAR</h2>
       <p class="sub">Permanent upgrades saved across sessions · Balance: <strong id="shop-balance" style="color:#C084FC">0 ◆</strong></p>
+      <button class="btn-reward" id="btn-shop-supply" style="margin-bottom:8px;">▶ Watch Ad: Free +25 ◆ Crystal Supply Drop</button>
       <div class="shop-section-title">Permanent Core Upgrades</div>
       <div id="shop-upgrades"></div>
       <div class="shop-section-title">Orb Skins</div>
@@ -422,6 +424,7 @@
   'use strict';
 
   const SAVE_KEY = 'orbit_breaker_save_v6';
+  const RUN_SAVE_KEY = 'orbit_breaker_run_v6';
   const PREV_KEYS = ['orbit_breaker_save_v5', 'orbit_breaker_save_v4', 'orbit_breaker_save_v3'];
   const LEGACY_BEST_KEY = 'orbit_breaker_best_v1';
 
@@ -481,6 +484,8 @@
   const defaultMeta = () => ({
     best: 0,
     crystals: 15,
+    loginStreak: 0,
+    lastLoginDate: '',
     unlockedSector: 1,
     sectorStars: {},
     bossKills: 0,
@@ -1347,6 +1352,9 @@ const StoreBridge = (() => {
     state.bombPower = 2;
     state.extraBounceSpeed = 1;
     state.revivedOnce = false;
+    state.claimedSupplyDrop = false;
+    state.claimedDoubleClear = false;
+    state.lastClearBonus = 20;
     state.celebratedBest = false;
     state.fastForward = false;
     state.blocks = [];
@@ -1464,6 +1472,16 @@ const StoreBridge = (() => {
       document.getElementById('btn-next-sector').textContent = sec.id < SECTORS.length ? `Launch Sector ${sec.id + 1} →` : 'Play Endless Arcade Mode ∞';
     }
     saveMeta();
+    clearRunSnapshot();
+    state.lastClearBonus = sec.reward;
+    state.claimedDoubleClear = false;
+    const dblBtn = document.getElementById('btn-double-clear');
+    if (dblBtn) {
+      const showDbl = !CG.hasAdblock && !CG.rewardedUnavailable && CG.PLATFORM !== 'itch';
+      dblBtn.style.display = showDbl ? 'block' : 'none';
+      dblBtn.disabled = false;
+      dblBtn.textContent = `▶ Watch Ad: Double Crystal Bonus (+${sec.reward} ◆)`;
+    }
     document.getElementById('clear-stars').textContent = '★'.repeat(starsEarned) + '☆'.repeat(3 - starsEarned);
     document.getElementById('clear-score').textContent = state.score;
     document.getElementById('clear-best').textContent = meta.best;
@@ -1533,6 +1551,11 @@ const StoreBridge = (() => {
   // --- Persistent Crystal Hangar Shop ---
   function renderShop() {
     shopBalance.textContent = `${meta.crystals} ◆`;
+    const supBtn = document.getElementById('btn-shop-supply');
+    if (supBtn) {
+      const canSupply = !state.claimedSupplyDrop && !CG.hasAdblock && !CG.rewardedUnavailable && CG.PLATFORM !== 'itch';
+      supBtn.style.display = canSupply ? 'block' : 'none';
+    }
     shopUpgrades.innerHTML = '';
     META_UPGRADES.forEach(up => {
       const lvl = meta[up.key] || 0;
@@ -1634,6 +1657,7 @@ const StoreBridge = (() => {
       showUpgradeMenu();
     } else {
       state.phase = 'aim';
+      saveRunSnapshot();
     }
   }
 
@@ -1654,6 +1678,7 @@ const StoreBridge = (() => {
   }
 
   function triggerGameOver() {
+    clearRunSnapshot();
     state.phase = 'over';
     CG.gameplayStop();
     AudioSys.playBoom();
@@ -2044,6 +2069,11 @@ const StoreBridge = (() => {
       else break;
     }
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FDE047';
+    ctx.fill();
     ctx.restore();
   }
 
@@ -2111,9 +2141,10 @@ const StoreBridge = (() => {
     drawRoundedRect(board.x, board.y, board.w, board.h, 14);
     ctx.fillStyle = 'rgba(7, 12, 26, 0.85)';
     ctx.fill();
-    ctx.strokeStyle = (state.mode === 'sector' || state.mode === 'daily') ? sec.accent : 'rgba(56, 189, 248, 0.42)';
-    ctx.globalAlpha = 0.52;
-    ctx.lineWidth = 2;
+    const hotCombo = state.overdriveActive || state.combo >= 12;
+    ctx.strokeStyle = hotCombo ? '#FBBF24' : ((state.mode === 'sector' || state.mode === 'daily') ? sec.accent : 'rgba(56, 189, 248, 0.42)');
+    ctx.globalAlpha = hotCombo ? (0.72 + Math.sin(tutorialClock * 8) * 0.2) : 0.52;
+    ctx.lineWidth = hotCombo ? 3 : 2;
     ctx.stroke();
     ctx.globalAlpha = 1;
 
@@ -2453,6 +2484,98 @@ const StoreBridge = (() => {
 
   window.addEventListener('resize', resize);
   resize();
+  function saveRunSnapshot() {
+    if (state.wave <= 1 && state.score === 0) return;
+    try {
+      const snap = {
+        mode: state.mode, sectorId: state.sectorId, wave: state.wave, score: state.score,
+        runCrystals: state.runCrystals, blocksCleared: state.blocksCleared,
+        orbCount: state.orbCount, orbDamage: state.orbDamage,
+        overdriveNextTurn: state.overdriveNextTurn, critChance: state.critChance,
+        bombPower: state.bombPower, extraBounceSpeed: state.extraBounceSpeed,
+        revivedOnce: state.revivedOnce, claimedSupplyDrop: !!state.claimedSupplyDrop,
+        blocks: state.blocks, pickups: state.pickups
+      };
+      localStorage.setItem(RUN_SAVE_KEY, JSON.stringify(snap));
+    } catch (e) {}
+  }
+
+  function clearRunSnapshot() {
+    try { localStorage.removeItem(RUN_SAVE_KEY); } catch (e) {}
+  }
+
+  function tryRestoreRunSnapshot() {
+    try {
+      const raw = localStorage.getItem(RUN_SAVE_KEY);
+      if (!raw) return false;
+      const s = JSON.parse(raw);
+      if (!s || !Array.isArray(s.blocks) || s.blocks.length === 0 || s.wave < 2) return false;
+      resetGame(s.mode || 'sector', s.sectorId || 1);
+      state.wave = s.wave; state.score = s.score || 0; state.runCrystals = s.runCrystals || 0;
+      state.blocksCleared = s.blocksCleared || 0; state.orbCount = s.orbCount || (3 + meta.lvlOrbs);
+      state.orbDamage = s.orbDamage || (1 + meta.lvlDmg); state.overdriveNextTurn = !!s.overdriveNextTurn;
+      state.critChance = s.critChance || 0.08; state.bombPower = s.bombPower || 2;
+      state.extraBounceSpeed = s.extraBounceSpeed || 1; state.revivedOnce = !!s.revivedOnce;
+      state.claimedSupplyDrop = !!s.claimedSupplyDrop;
+      state.blocks = s.blocks; state.pickups = Array.isArray(s.pickups) ? s.pickups : [];
+      hasFiredFirstShot = true; hintEl.style.opacity = '0';
+      syncHUD();
+      showToast(`⚡ Resumed Wave ${state.wave}!`);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function checkDailyLoginStreak() {
+    const today = todayUtcKey();
+    if (meta.lastLoginDate === today) return;
+    const prev = meta.lastLoginDate || '';
+    const yd = new Date(Date.now() - 86400000);
+    const yKey = `${yd.getUTCFullYear()}${String(yd.getUTCMonth() + 1).padStart(2, '0')}${String(yd.getUTCDate()).padStart(2, '0')}`;
+    meta.loginStreak = (prev === yKey) ? ((meta.loginStreak || 0) + 1) : 1;
+    meta.lastLoginDate = today;
+    if (meta.loginStreak >= 2) {
+      const bonus = Math.min(50, 10 + meta.loginStreak * 5);
+      meta.crystals += bonus;
+      setTimeout(() => showToast(`🔥 Day ${meta.loginStreak} Streak: +${bonus} ◆ Crystals!`), 900);
+    }
+    saveMeta();
+    syncHUD();
+  }
+
+  document.getElementById('btn-double-clear').addEventListener('click', () => {
+    if (state.claimedDoubleClear) return;
+    CG.requestAd('rewarded', (granted, errored) => {
+      const btn = document.getElementById('btn-double-clear');
+      if (granted) {
+        state.claimedDoubleClear = true;
+        const extra = state.lastClearBonus || 20;
+        addCrystals(extra);
+        AudioSys.playPickup();
+        if (btn) { btn.disabled = true; btn.textContent = `✓ 2x Bonus Claimed (+${extra} ◆)`; }
+        showToast(`✨ Doubled Sector Reward: +${extra} ◆!`);
+      } else if (errored) {
+        if (btn) btn.style.display = 'none';
+        showToast('Ad unavailable right now — Sector Crystals already saved!');
+      }
+    });
+  });
+
+  document.getElementById('btn-shop-supply').addEventListener('click', () => {
+    if (state.claimedSupplyDrop) return;
+    CG.requestAd('rewarded', (granted, errored) => {
+      if (granted) {
+        state.claimedSupplyDrop = true;
+        addCrystals(25);
+        AudioSys.playPickup();
+        renderShop();
+        showToast('🎁 Supply Drop Claimed: +25 ◆ Crystals!');
+      } else if (errored) {
+        renderShop();
+        showToast('Ad unavailable right now — earn ◆ Crystals by clearing blocks!');
+      }
+    });
+  });
+
   CG.init({
     onMute: flag => AudioSys.setTempMute(flag),
     onCloudData: raw => {
@@ -2474,7 +2597,10 @@ const StoreBridge = (() => {
       } catch (e) {}
     }
   });
-  resetGame('sector', Math.min(SECTORS.length, meta.unlockedSector || 1));
+  if (!tryRestoreRunSnapshot()) {
+    resetGame('sector', Math.min(SECTORS.length, meta.unlockedSector || 1));
+  }
+  checkDailyLoginStreak();
   requestAnimationFrame(loop);
 })();
 </script>
